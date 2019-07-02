@@ -1,0 +1,163 @@
+#!/usr/local/bin/guash
+#
+# mkcopies.gua
+#
+#     This script creates copies of a selected file.
+#
+# Copyright (C) 2014 Roberto Luiz Souza Monteiro
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: mkcopies.gua,v 1.0 2014/07/27 19:51:00 monteiro Exp $
+#
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "noname"
+log_file = "noname"
+prefix = "sample"
+nfiles = 1
+index_from = 1
+index_to = 1
+index_in = 1
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: mkcopies option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: mkcopies option1 value1 [option1 value1]")
+        println("-h    --help      show the options sumary")
+        println("-i                input file")
+        println("-l                log file")
+        println("      --prefix    prefix for multiple file creation(default=\"sample\")")
+        println("      --nfiles    number of files for multiple file creation")
+        println("      --from      first file index for multiple file creation")
+        println("      --to        last file index for multiple file creation")
+        println("      --in        total number of files in the file set")
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-l") {
+        i = i + 1
+        log_file = argv[i]
+    } elseif (argv[i] == "--prefix") {
+        i = i + 1
+        prefix = argv[i]
+    } elseif (argv[i] == "--nfiles") {
+        i = i + 1
+        nfiles = eval(argv[i])
+    } elseif (argv[i] == "--from") {
+        i = i + 1
+        index_from = eval(argv[i])
+    } elseif (argv[i] == "--to") {
+        i = i + 1
+        index_to = eval(argv[i])
+    } elseif (argv[i] == "--in") {
+        i = i + 1
+        index_in = eval(argv[i])
+    }
+    i = i + 1
+} 
+
+# Get the current time...
+t1 = time();
+
+# Check if the input file name was suplied.
+if (input_file == "noname") {
+    println("Error: input file name is mandatory.")
+    exit(1)
+}
+
+# Create the log file...
+if (log_file != "noname") {
+    fl = fopen(log_file, "w")
+}
+
+# Calculate the file index number range...
+if (index_from < 1) {
+    index_from = 1
+}
+if (index_to <= 1) {
+    if (nfiles > 1) {
+        index_to = index_from + nfiles - 1
+    }
+}
+nfiles = index_to - index_from + 1
+if (index_in <= 1) {
+    index_in = nfiles
+}
+
+println("Processing " + nfiles + " files...\n")
+
+# Start file creation...
+for (nf = index_from; nf <= index_to; nf = nf + 1) {
+    # Get the current time...
+    ts1 = time();
+    
+    if (nfiles > 1) {
+        output_file = prefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", nf) + ".net"
+    }
+    
+    # Save the network file...
+    println("Creating file " + output_file + "...")
+    
+    fs = fopen(input_file, "r")
+    ft = fopen(output_file, "w")
+
+    while (!feof(fs)) {
+        if((line = fgets(fs)) == NULL) { 
+            break
+        }
+
+        fputs(line, ft)
+    }
+
+    fs = fclose(fs)
+    ft = fclose(ft)
+    
+    # Get the current time...
+    ts2 = time();
+    
+    # Show the elapsed time...
+    printf("Elapsed time to generate this file: %.3f seconds\n\n", ts2 - ts1)
+    
+    # Log the elapsed time...
+    if (log_file != "noname") {
+        fputs(sprintf("%d\t%.3f\n", nf, ts2 - ts1), fl)
+    }
+}
+
+# Close the log file...
+if (log_file != "noname") {
+    fclose(fl)
+}
+
+# Get the current time...
+t2 = time();
+
+# Show the elapsed time...
+printf("Elapsed time to generate %d files: %.3f seconds\n\n", nfiles, t2 - t1)
+

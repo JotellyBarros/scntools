@@ -1,0 +1,151 @@
+#!/usr/local/bin/guash
+#
+# mkaffnet.gua
+#
+#     This script creates a Pajek network file from a CSV file,
+#     containing the actors chromosomes.
+#
+# Copyright (C) 2011 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: mkaffnet.gua,v 1.0 2011/06/18 18:16:00 monteiro Exp $
+#
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "output.csv"
+separator = ";"
+label = 0
+patterns = ""
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: mkaffnet option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: mkaffnet option1 value1 [option1 value1]")
+        println("-h    --help    show the options sumary")
+        println("-i              input file")
+        println("-o              output file")
+        println("-s              column separator(default=\";\")")
+        println("-c              column number of vertex label(default=0)")
+        println("-p              chromosome patterns")
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "-s") {
+        i = i + 1
+        separator = argv[i]
+    } elseif (argv[i] == "-c") {
+        i = i + 1
+        label = eval(argv[i])
+    } elseif (argv[i] == "-p") {
+        i = i + 1
+        patterns = argv[i]
+    }
+    i = i + 1
+} 
+
+# Check if the input file name was suplied...
+if (input_file == "noname") {
+    println("Error: input file name is mandatory.")
+    exit(1)
+}
+
+# Get chromosomes patterns...
+if (patterns != "") {
+    record = split(trim(patterns), ";")
+    
+    foreach (record; n; v) {
+        col = split(trim(v), "=")
+        
+        name = trim(col[0], " \"")
+        value = trim(col[1], " \"")
+        
+        pattern[name] = value
+    }
+}
+
+# Generate the Pajek network file...
+fs = fopen(input_file, "r")
+
+# Skip column names...
+line1 = fgets(fs)
+
+# Generate vertex chromosomes...
+n = 1
+while (!feof(fs)) {
+    if((line1 = fgets(fs)) == NULL) {
+        break
+    }
+    
+    record1 = split(trim(line1, " \t\r\n"), separator)
+
+    # Get vertex label...
+    vertice[n] = trim(record1[label], " \"")
+    
+    if (length(record1) > 1) {
+        vertice[n] = vertice[n] + ","
+    } else {
+        break
+    }
+
+    foreach(record1; key; value) {
+        if (key != label) {
+            value = trim(value, " \"")
+            
+            vertice[n] = vertice[n] + pattern[value]
+            
+            if (key < (length(record1) - 1)) {
+                vertice[n] = vertice[n] + ","
+            }
+        }
+    }
+    
+    n = n + 1
+}
+n = n - 1
+
+fs = fclose(fs)
+
+# Save the Pajek network file...
+ft = fopen(output_file, "w")
+
+fputs("*Vertices " + n + "\r\n", ft)
+
+if (exists("vertice")) {
+    foreach (vertice; name; value) {
+        fputs("" + name + " \"" + value + "\"\r\n", ft)    
+    }
+}
+
+fputs("*Edges\r\n", ft)
+
+ft = fclose(ft)
+

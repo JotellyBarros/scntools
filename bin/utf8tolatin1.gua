@@ -1,0 +1,18 @@
+#!/usr/local/bin/guash
+
+fs = fopen(argv[2], "r")
+ft = fopen(argv[3], "w")
+
+while (!feof(fs)) {
+    if((line = fgets(fs)) == NULL) {
+        break
+    }
+    
+    converted = utf8dec(line)
+    
+    fputs(converted, ft)
+}
+
+fs = fclose(fs)
+ft = fclose(ft)
+

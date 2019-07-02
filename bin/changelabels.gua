@@ -1,0 +1,329 @@
+#!/usr/local/bin/guash
+#
+# changelabels.gua
+#
+#     This script does several network transformations.
+#
+# Copyright (C) 2016 Roberto Luiz Souza Monteiro,
+#                    Hernane Borges de Barros Pereira.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: changelabels.gua,v 1.0 2016/03/28 18:35:00 monteiro Exp $
+#
+
+function CNA_SaveFile(filename, adj, type = "edges") {
+    dim_adj = dim(adj)
+    dim_i = dim_adj[0]
+    dim_j = dim_adj[1]
+
+    # Each line in a Pajek files must terminate with CR+LF.
+    # Windows will automaticly converts "\n" to "\r\n", but
+    # Linux will not.
+    if ($SYS_HOST == "linux") {
+        new_line = "\r\n"
+    } else {
+        new_line = "\n"
+    }
+
+    fp = fopen(filename, "w")
+
+    # Save vertices...
+    fputs("*Vertices " + (dim_i - 1) + new_line, fp)
+    for (i = 1; i < dim_i; i = i + 1) {
+        fputs(i + " \"" + adj[i, 0] + "\"" + new_line, fp)
+    }
+
+    # Save edges...
+    if (type == "edges") {
+        fputs("*Edges" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                if (adj[i, j] != 0) {
+                    fputs(i + " " + j + " " + adj[i, j] + new_line, fp)
+                }
+            }
+        }
+    # Save arcs...
+    } elseif (type == "arcs") {
+        fputs("*Arcs" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                if (adj[i, j] != 0) {
+                    fputs(i + " " + j + " " + adj[i, j] + new_line, fp)
+                }
+            }
+        }
+    # Save matrix...
+    } elseif (type == "matrix") {
+        fputs("*Matrix" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                fputs(" " + adj[i, j], fp)
+            }
+            fputs(new_line, fp)
+        }
+    }
+
+    fp = fclose(fp)
+}
+
+function CNA_LoadFile(file_name) {
+    fp = fopen(file_name, "r")
+
+    file_section = "none"
+
+    while (!feof(fp)) {
+        if((line = fgets(fp)) == NULL) { 
+            break
+        }
+
+        #record = split(trim(line, " \t\r\n"), " \t")
+        record = split(trim(line, " \t\r\n"))
+
+        if ((tolower(record[0]) == "*vertices") || (tolower(record[0]) == "*edges") || (tolower(record[0]) == "*arcs") || (tolower(record[0]) == "*matrix")) {
+            file_section = tolower(record[0])
+            if (file_section == "*vertices") {
+                n = eval(record[1]) + 1
+                adj = matrix(0, n, n)
+            }
+            i = 0
+            continue
+        }
+
+        if (file_section == "*vertices") {
+            adj[0, i + 1] = eval(record[1])
+            adj[i + 1, 0] = eval(record[1])
+            i = i + 1
+        } elseif (file_section == "*edges") {
+            i = eval(record[0])
+            j = eval(record[1])
+            if (length(record) == 2) {
+                adj[i, j] = 1
+                adj[j, i] = 1
+            } else {
+                adj[i, j] = eval(record[2])
+                adj[j, i] = eval(record[2])
+            }
+        } elseif (file_section == "*arcs") {
+            i = eval(record[0])
+            j = eval(record[1])
+            if (length(record) == 2) {
+                adj[i, j] = 1
+            } else {
+                adj[i, j] = eval(record[2])
+            }
+        } elseif (file_section == "*matrix") {
+            foreach(record; j; v) {
+                adj[i + 1, j + 1] = eval(v)
+                if (i == n) {
+                    break
+                }
+            }
+            i = i + 1
+        }
+    }
+
+    fp = fclose(fp)
+
+    return(adj)
+}
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "noname"
+output_file_type = "edges"
+dictionary_file = "noname"
+prefix = "network"
+output_prefix = "noname"
+nfiles = 1
+index_from = 1
+index_to = 1
+index_in = 1
+separator = ";"
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: changelabels option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: changelabels option1 value1 [option1 value1]")
+        println("-h    --help             show the options sumary")
+        println("-i                       input file")
+        println("-o                       output file")
+        println("-t                       output file type(default=edges)")
+        println("-d                       dictionary file")
+        println("      --prefix           prefix for multiple file calc.(default=\"network\")")
+        println("      --oprefix          output prefix for multiple file calc.(default=\"network\")")
+        println("      --nfiles           number of files for multiple file calculation")
+        println("      --from             first file index for multiple file calculation")
+        println("      --to               last file index for multiple file calculation")
+        println("      --in               total number of files in the file set")
+        println("      --separator        column separator(default=\";\")")
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "-t") {
+        i = i + 1
+        output_file_type = argv[i]
+    } elseif (argv[i] == "-d") {
+        i = i + 1
+        dictionary_file = argv[i]
+    } elseif (argv[i] == "--prefix") {
+        i = i + 1
+        prefix = argv[i]
+    } elseif (argv[i] == "--oprefix") {
+        i = i + 1
+        output_prefix = argv[i]
+    } elseif (argv[i] == "--nfiles") {
+        i = i + 1
+        nfiles = eval(argv[i])
+    } elseif (argv[i] == "--from") {
+        i = i + 1
+        index_from = eval(argv[i])
+    } elseif (argv[i] == "--to") {
+        i = i + 1
+        index_to = eval(argv[i])
+    } elseif (argv[i] == "--in") {
+        i = i + 1
+        index_in = eval(argv[i])
+    } elseif (argv[i] == "--separator") {
+        i = i + 1
+        separator = argv[i]
+    }
+    i = i + 1
+} 
+
+# Get the current time...
+t1 = time();
+
+# Calculate the file index number range...
+if (index_from < 1) {
+    index_from = 1
+}
+if (index_to <= 1) {
+    if (nfiles > 1) {
+        index_to = index_from + nfiles - 1
+    }
+}
+nfiles = index_to - index_from + 1
+if (index_in <= 1) {
+    index_in = nfiles
+}
+
+# Check if the dictionary file name was suplied.
+if (dictionary_file == "noname") {
+    println("Error: dictionary file name is mandatory.")
+    exit(1)
+}
+
+# Load the dictionary...
+fp = fopen(dictionary_file, "r")
+
+# Skip the file header...
+line = fgets(fp)
+
+while (!feof(fp)) {
+    if ((line = fgets(fp)) == NULL) { 
+        break
+    }
+
+    record = split(trim(line, " \t\n"), separator)
+
+    if (length(record[0]) > 0) {
+        dictionary[eval(record[1])] = eval(record[0])
+    } else {
+        dictionary[eval(record[1])] = ""
+    }
+}
+
+fp = fclose(fp)
+
+println("Processing " + nfiles + " files...\n")
+
+# Start the simulation...
+for (nf = index_from; nf <= index_to; nf = nf + 1) {
+    if (nfiles > 1) {
+        input_file = prefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", nf) + ".net"
+        if (output_prefix == "noname") {
+            output_file = prefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", nf) + ".net"
+        } else {
+            output_file = output_prefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", nf) + ".net"
+        }
+    }
+
+    println("Processing file " + input_file + "...")
+
+    # Get the current time...
+    tn1 = time();
+
+    # Load the network file.
+    adj = CNA_LoadFile(input_file)
+
+    dim_adj = dim(adj)
+    dim_i = dim_adj[0]
+    dim_j = dim_adj[1]
+    
+    if (exists("dictionary")) {
+        for (i = 0; i < dim_i; i = i + 1) {
+            if (exists("label")) {
+                label = NULL
+            }
+
+            try {
+                label = dictionary[adj[i, 0]]
+            } catch {
+            }
+            
+            if (exists("label")) {
+                if (length(trim(label, " \t\n")) != 0) {
+                    adj[i, 0] = label
+                    adj[0, i] = label
+                }
+            }
+        }
+    }
+    
+    # Save the modified network file.
+    if (output_file != "noname") {
+       CNA_SaveFile(output_file, adj, output_file_type)
+    }
+    
+    # Get the current time...
+    tn2 = time();
+
+    # Show the elapsed time...
+    printf("Elapsed time to process this file: %.3f seconds\n\n", tn2 - tn1)
+}
+
+# Get the current time...
+t2 = time();
+
+# Show the elapsed time...
+printf("Elapsed time to process %d files: %.3f seconds\n\n", nfiles, t2 - t1)
+

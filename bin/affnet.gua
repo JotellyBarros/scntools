@@ -1,0 +1,1018 @@
+#!/usr/local/bin/guash
+#
+# evolnet.gua
+#
+#     This script simulates the evolution of a network based on the actors affinity.
+#
+# Copyright (C) 2011 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: evolnet.gua,v 2.0 2012/01/28 11:44:00 monteiro Exp $
+#
+
+function CNA_SaveFile(filename, adj, type = "edges") {
+    dim_adj = dim(adj)
+    dim_i = dim_adj[0]
+    dim_j = dim_adj[1]
+
+    # Each line in a Pajek files must terminate with CR+LF.
+    # Windows will automaticly converts "\n" to "\r\n", but
+    # Linux will not.
+    if ($SYS_HOST == "linux") {
+        new_line = "\r\n"
+    } else {
+        new_line = "\n"
+    }
+
+    fp = fopen(filename, "w")
+
+    # Save vertices...
+    fputs("*Vertices " + (dim_i - 1) + new_line, fp)
+    for (i = 1; i < dim_i; i = i + 1) {
+        fputs(i + " \"" + adj[i, 0] + "\"" + new_line, fp)
+    }
+
+    # Save edges...
+    if (type == "edges") {
+        fputs("*Edges" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                if (adj[i, j] != 0) {
+                    fputs(i + " " + j + " " + adj[i, j] + new_line, fp)
+                }
+            }
+        }
+    # Save arcs...
+    } elseif (type == "arcs") {
+        fputs("*Arcs" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                if (adj[i, j] != 0) {
+                    fputs(i + " " + j + " " + adj[i, j] + new_line, fp)
+                }
+            }
+        }
+    # Save matrix...
+    } elseif (type == "matrix") {
+        fputs("*Matrix" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                fputs(" " + adj[i, j], fp)
+            }
+            fputs(new_line, fp)
+        }
+    }
+
+    fp = fclose(fp)
+}
+
+function CNA_LoadFile(file_name) {
+    fp = fopen(file_name, "r")
+
+    file_section = "none"
+
+    while (!feof(fp)) {
+        if((line = fgets(fp)) == NULL) { 
+            break
+        }
+
+        #record = split(trim(line, " \t\r\n"), " \t")
+        record = split(trim(line, " \t\r\n"))
+
+        if ((tolower(record[0]) == "*vertices") || (tolower(record[0]) == "*edges") || (tolower(record[0]) == "*arcs") || (tolower(record[0]) == "*matrix")) {
+            file_section = tolower(record[0])
+            if (file_section == "*vertices") {
+                n = eval(record[1]) + 1
+                adj = matrix(0, n, n)
+            }
+            i = 0
+            continue
+        }
+
+        if (file_section == "*vertices") {
+            adj[0, i + 1] = eval(record[1])
+            adj[i + 1, 0] = eval(record[1])
+            i = i + 1
+        } elseif (file_section == "*edges") {
+            i = eval(record[0])
+            j = eval(record[1])
+            if (length(record) == 2) {
+                adj[i, j] = 1
+                adj[j, i] = 1
+            } else {
+                adj[i, j] = eval(record[2])
+                adj[j, i] = eval(record[2])
+            }
+        } elseif (file_section == "*arcs") {
+            i = eval(record[0])
+            j = eval(record[1])
+            if (length(record) == 2) {
+                adj[i, j] = 1
+            } else {
+                adj[i, j] = eval(record[2])
+            }
+        } elseif (file_section == "*matrix") {
+            foreach (record; j; v) {
+                adj[i + 1, j + 1] = eval(v)
+                if (i == n) {
+                    break
+                }
+            }
+            i = i + 1
+        }
+
+        if (feof(fp)) {
+            break
+        }
+    }
+
+    fp = fclose(fp)
+
+    return(adj)
+}
+
+function CNA_Degrees(adj, directed = FALSE) {
+    dim_edges = dim(adj)
+    dim_i = dim_edges[0]
+    dim_j = dim_edges[1]
+
+    degrees = matrix(0, dim_i, 3)
+    
+    for (i = 1; i < dim_i; i = i + 1) {
+        degrees[i, 0] = count(adj, i, 1, i, dim_j - 1)
+        degrees[i, 1] = count(adj, 1, i, dim_i - 1, i)
+        if (!directed) {
+            degrees[i, 2] = degrees[i, 0]
+        } else {
+            degrees[i, 2] = degrees[i, 0] + degrees[i, 1]
+        }
+    }
+
+    return(degrees)
+}
+
+function CNA_DegreeDistribution(degrees) {
+    dim_degrees = dim(degrees)
+    dim_i = dim_degrees[0]
+    dim_j = dim_degrees[1]
+
+    for (i = 1; i < dim_i; i = i + 1) {
+        degree = degrees[i, 2]
+
+        try {
+            if (search(keys(degdist), degree) == NULL) {
+                degdist[degree] = 1
+            } else {
+                degdist[degree] = degdist[degree] + 1
+			}
+        } catch {
+                degdist[degree] = 1
+        }
+    }
+
+    hist = matrix(0, length(degdist), 3)
+    
+    i = 0
+    foreach(degdist; deg; dist) {
+        hist[i, 0] = deg
+        hist[i, 1] = dist
+		i = i + 1
+    }
+
+    dim_hist = dim(hist)
+
+    sumdegs = sum(hist, 0, 1, dim_hist[0] - 1, 1)
+
+    for (i = 0; i < dim_hist[0]; i = i + 1) {
+        hist[i, 2] = (hist[i, 1] / sumdegs) * 100
+    }
+
+	return(hist)
+}
+
+function CNA_AverageDegree(hist) {
+    dim_deg = dim(degrees)
+    dim_i = dim_deg[0]
+    dim_j = dim_deg[1]
+
+    avgdeg = avg(degrees, 1, 2, (dim_i - 1), 2)
+
+    return(avgdeg)
+}
+
+function tostring(array) {
+    len = length(array)
+    
+    str = ""
+
+    foreach (array; n; v) {
+        if (n < (len - 1)) {
+            str = str + v + ","
+        } else {
+            str = str + v
+        }
+    }
+
+    return(str)
+}
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "output.net"
+log_file = "noname"
+sprefix = "sample"
+nsamples = 1
+index_from = 1
+index_to = 1
+index_in = 1
+exact = FALSE
+tseed = FALSE
+ngen = 10
+ctax = 1.0
+mtax = 0.01
+atax = 0.25
+binary_code = FALSE
+code_symbols = "0,1"
+empty_symbol = "0"
+method = "elite"
+mode = "individual"
+snapshots = FALSE
+prefix = "snapshot"
+interval = 1
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: evolnet option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: evolnet option1 value1 [option1 value1]")
+        println("-h    --help      show the options sumary")
+        println("-i                input file")
+        println("-o                output file")
+        println("-l                log file")
+        println("      --sprefix   sample file name prefix(default = \"sample\")")
+        println("      --nsamples  number of samples for multiple sample creation")
+        println("      --from      first file index for multiple sample creation")
+        println("      --to        last file index for multiple sample creation")
+        println("      --in        total number of files in the sample set")
+        println("-x                exact genes comparation")
+        println("      --tseed     use the time as seed to random number generation")
+        println("      --ngen      number of generations(default = 10)")
+        println("      --ctax      crossover tax(default = 1.0)")
+        println("      --mtax      mutation tax(default = 0.01)")
+        println("      --atax      affinity tax(default = 0.25)")
+        println("      --bin       amino acids are coded as binary strings")
+        println("      --code      amino acids code symbols(default = \"0,1\")")
+        println("      --empty     empty symbol(default = \"0\")")
+        println("      --method    method for natural selection(default = \"elite\")")
+        println("      --mode      in the \"individual\" mode, the crossover and mutation rates")
+        println("                  are applied to the total of individuals in the population,")
+        println("                  while in the \"gene\" mode, rates are applied to the total")
+        println("                  number of genes in the population(default = \"individual\")")
+        println("      --snapshots take snapshots")
+        println("      --prefix    snapshot prefix(default = \"snapshot\")")
+        println("      --interval  snapshots interval(default = 1)")
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "-l") {
+        i = i + 1
+        log_file = argv[i]
+    } elseif (argv[i] == "--sprefix") {
+        i = i + 1
+        sprefix = argv[i]
+    } elseif (argv[i] == "--nsamples") {
+        i = i + 1
+        nsamples = eval(argv[i])
+    } elseif (argv[i] == "--from") {
+        i = i + 1
+        index_from = eval(argv[i])
+    } elseif (argv[i] == "--to") {
+        i = i + 1
+        index_to = eval(argv[i])
+    } elseif (argv[i] == "--in") {
+        i = i + 1
+        index_in = eval(argv[i])
+    } elseif (argv[i] == "-x") {
+        exact = TRUE
+    } elseif (argv[i] == "--tseed") {
+        tseed = TRUE
+    } elseif (argv[i] == "--ngen") {
+        i = i + 1
+        ngen = eval(argv[i])
+    } elseif (argv[i] == "--ctax") {
+        i = i + 1
+        ctax = eval(argv[i])
+    } elseif (argv[i] == "--mtax") {
+        i = i + 1
+        mtax = eval(argv[i])
+    } elseif (argv[i] == "--atax") {
+        i = i + 1
+        atax = eval(argv[i])
+    } elseif (argv[i] == "--bin") {
+        binary_code = TRUE
+    } elseif (argv[i] == "--code") {
+        i = i + 1
+        code_symbols = argv[i]
+    } elseif (argv[i] == "--empty") {
+        i = i + 1
+        empty_symbol = argv[i]
+    } elseif (argv[i] == "--method") {
+        i = i + 1
+        method = argv[i]
+    } elseif (argv[i] == "--mode") {
+        i = i + 1
+        mode = argv[i]
+    } elseif (argv[i] == "--snapshots") {
+        snapshots = TRUE
+    } elseif (argv[i] == "--prefix") {
+        i = i + 1
+        prefix = argv[i]
+    } elseif (argv[i] == "--interval") {
+        i = i + 1
+        interval = eval(argv[i])
+    }
+    i = i + 1
+} 
+
+# Check if the input file name was suplied.
+if (input_file == "noname") {
+    println("Error: input file name is mandatory.")
+    exit(1)
+}
+
+t1 = time();
+
+# Create the log file...
+if (log_file != "noname") {
+    fl = fopen(log_file, "w")
+}
+
+# Calculate the file index number range...
+if (index_from < 1) {
+    index_from = 1
+}
+if (index_to <= 1) {
+    if (nsamples > 1) {
+        index_to = index_from + nsamples - 1
+    }
+}
+nsamples = index_to - index_from + 1
+if (index_in <= 1) {
+    index_in = nsamples
+}
+
+# Get the amino acids code symbols...
+codes = split(code_symbols, ",")
+nsymbols = length(codes)
+
+println("Generating " + nsamples + " samples, using " + method + " method, each one with " + ngen + " generations,")
+println("performing " + (ctax * 100) + "% of cross., " + (mtax * 100) + "% of mutation, and linking at " + (atax * 100) + "% of affinity...\n")
+
+for (nf = index_from; nf <= index_to; nf = nf + 1) {
+    println("Generating sample " + nf + "...")
+    
+    # Get the current time...
+    ts1 = time();
+    
+    # Load the network file...
+    adj = CNA_LoadFile(input_file)
+
+    dim_adj = dim(adj)
+    dim_i = dim_adj[0]
+    dim_j = dim_adj[1]
+    
+    # Get the number of individuals in this population...
+    nindividuals = dim_i - 1
+    
+    # Get the number of genes in each chromosome...
+    node = split(adj[1, 0], ",")
+    nattributes = length(node) - 1
+    
+    println("Population has " + nindividuals + " individuals, each individual with one chromosome with " + nattributes + " genes.")
+    
+    if (nsamples > 1) {
+        output_file = sprefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", nf) + ".net"
+    }
+    
+    if (tseed) {
+        srandom(time)
+    } else {
+        srandom(nf)
+    }
+    
+    # Take a snapshot...
+    if (snapshots) {
+        # Save the network file...
+        if (nsamples > 1) {
+            CNA_SaveFile(sprefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", nf) + "-" + prefix + "-" + sprintf("%0" + length(toString(ngen)) + "." + length(toString(ngen)) + "d", 0) + ".net", adj)
+        } else {
+            CNA_SaveFile(prefix + "-" + sprintf("%0" + length(toString(ngen)) + "." + length(toString(ngen)) + "d", 0) + ".net", adj)
+        }
+    }
+    
+    # The evolution starts here...
+    for (n = 1; n <= ngen; n = n + 1) {
+        println("Getting sample " + nf + " generation " + n + "...")
+        
+        # Get the current time...
+        tg1 = time();
+        
+        if (method == "centrality") {
+            # Connect or disconnect nodes based on the affinity tax...        
+            for (i = 1; i < dim_i; i = i + 1) {
+                for (j = 1; j < dim_j; j = j + 1) {
+                    if (i != j) {
+                        node1 = split(adj[i, 0], ",")
+                        node2 = split(adj[0, j], ",")
+                        
+                        c = 0
+         
+                        for (index = 1; index <= nattributes; index = index + 1) {
+                            if (exact) {
+                                if (node1[index] == node2[index]) {
+                                    c = c + 1
+                                }
+                            } else {
+                                if ((node1[index] != empty_symbol) && (node2[index] != empty_symbol)) {
+                                    if (node1[index] == node2[index]) {
+                                        c = c + 1
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (((c * 1.0) / nattributes) >= atax) {
+                            adj[i, j] = 1
+                        } else {
+                            adj[i, j] = 0
+                        }
+                    }
+                }
+            }
+            
+            # For it generation we must found the best adapted individual(vertice).
+            # For now, the best individual is the one who has the greater degree centrality.
+            
+            # Calculate vertex degrees...
+            degrees = CNA_Degrees(adj)
+
+            # Calculate vertex degrees...
+            hist = CNA_Degrees(adj)
+
+            # Calculate average degree...
+            avgdeg = CNA_AverageDegree(hist)
+
+            # Perform a crossover...
+            for (i = 1; i < dim_i; i = i + 1) {
+                for (j = 1; j < dim_j; j = j + 1) {
+                    if (adj[i, j] == 1) {
+                        if (degrees[j, 2] > avgdeg) {
+                            for (k = 1; k < dim_i; k = k + 1) {
+                                adj[i, k] = adj[j, k]
+                            }
+                        }
+                    }
+                }
+            }
+            # Perform mutations on vertices...
+            if (mtax > 0) {
+                # Remove edges...
+                narcs = count(adj, 1, 1, dim_i - 1, dim_j - 1)
+                
+                marcs = roundl(narcs * mtax)
+                
+                if (marcs > narcs) {
+                    println("Error: number of arcs to left in file exceeds the total number of arcs.")
+                    exit(1)
+                }
+                
+                # Mutate arcs...
+                while (marcs > 0) {
+                    arc_i = roundl(random() * (dim_i - 1))
+                    arc_j = roundl(random() * (dim_j - 1))
+                    
+                    if ((arc_i == 0) || (arc_j == 0)) {
+                        continue
+                    }
+                    
+                    if (adj[arc_i, arc_j] == 0) {
+                        # Create a link...
+                        adj[arc_i, arc_j] = 1
+                    } else {
+                        # Delete the link...
+                        adj[arc_i, arc_j] = 0
+                    }
+                    
+                    marcs = marcs - 1
+                }
+            }
+        } elseif (method == "affinity") {
+            if (mode == "individual") {
+                # Perform a crossover...
+                if (ctax > 0) {
+                    # Select the descendants individuals...
+                    descendants = matrix(0, nindividuals + 1)
+                    
+                    ndescendants = roundl(nindividuals * ctax)
+                    
+                    while (ndescendants > 0) {
+                        di = roundl(random() * nindividuals)
+                        if (!descendants[di]) {
+                            descendants[di] = 1
+                            ndescendants = ndescendants - 1
+                        }
+                    }
+                    
+                    for (i = 1; i < dim_i; i = i + 1) {
+                        for (j = 1; j < dim_j; j = j + 1) {
+                            if ((i != j) && (adj[i, j] == 1)) {
+                                node1 = split(adj[i, 0], ",")
+                                node2 = split(adj[0, j], ",")
+                                
+                                # For each couple of chromosomes(chains of attributes), a crossover is done
+                                # based on a random attribute selection...
+                                for (index = 1; index <= nattributes; index = index + 1) {
+                                    pcross = random()
+                                    
+                                    if (pcross >= 0.5) {
+                                        temp = node1[index]
+                                        node1[index] = node2[index]
+                                        node2[index] = temp
+                                    }
+                                }
+                                # Born a descendant...
+                                if (descendants[i]) {
+                                    adj[i, 0] = tostring(node1)
+                                }
+                                if (descendants[j]) {
+                                    adj[0, j] = tostring(node2)
+                                }
+                            }
+                        }
+                    }
+                }
+                # Perform mutations on vertices...
+                if (mtax > 0) {
+                    # Select the mutant individuals...
+                    mutants = matrix(0, nindividuals + 1)
+                    
+                    nmutants = roundl(nindividuals * mtax)
+                    
+                    while (nmutants > 0) {
+                        mi = roundl(random() * nindividuals)
+                        if (!mutants[mi]) {
+                            mutants[mi] = 1
+                            nmutants = nmutants - 1
+                        }
+                    }
+                    
+                    for (i = 1; i < dim_i; i = i + 1) {
+                        if (mutants[i]) {
+                            node1 = split(adj[i, 0], ",")
+                            
+                            # For each chromosome(chain of attributes), a mutation is done
+                            # based on mutation tax...
+                            for (index = 1; index <= nattributes; index = index + 1) {
+                                psel = random()
+                                
+                                if (binary_code) {
+                                    if (psel >= 0.5) {
+                                        if (node1[index] == 0) {
+                                            node1[index] = 1
+                                        } else {
+                                            node1[index] = 0
+                                        }
+                                    }
+                                } else {
+                                    code_index = roundl(random() * (nsymbols - 1))
+                                    
+                                    if (psel >= 0.5) {
+                                        node1[index] = codes[code_index]
+                                    }
+                                }
+                            }
+                            # Became a mutant...
+                            attr = tostring(node1)
+                            adj[i, 0] = attr
+                            adj[0, i] = attr
+                        }
+                    }
+                }
+            } elseif (mode == "gene") {
+                # Perform a crossover...
+                if (ctax > 0) {
+                    # Select the descendants individuals...
+                    descendants = matrix(0, nindividuals * nattributes + 1)
+                    
+                    ndescendants = roundl(nindividuals * nattributes * ctax)
+                    
+                    while (ndescendants > 0) {
+                        di = roundl(random() * nindividuals * nattributes)
+                        if (!descendants[di]) {
+                            descendants[di] = 1
+                            ndescendants = ndescendants - 1
+                        }
+                    }
+                    
+                    for (i = 1; i < dim_i; i = i + 1) {
+                        for (j = 1; j < dim_j; j = j + 1) {
+                            if ((i != j) && (adj[i, j] == 1)) {
+                                node1 = split(adj[i, 0], ",")
+                                node2 = split(adj[0, j], ",")
+                                
+                                # For each couple of chromosomes(chains of attributes), a crossover is done
+                                # based on a random attribute selection...
+                                for (index = 1; index <= nattributes; index = index + 1) {
+                                    # Born a descendant...
+                                    if (descendants[i * index]) {
+                                        node1[index] = node2[index]
+                                        
+                                        adj[i, 0] = tostring(node1)
+                                    }
+                                    if (descendants[j * index]) {
+                                        node2[index] = node1[index]
+                                        
+                                        adj[0, j] = tostring(node2)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                # Perform mutations on vertices...
+                if (mtax > 0) {
+                    # Select the mutant individuals...
+                    mutants = matrix(0, nindividuals * nattributes + 1)
+                    
+                    nmutants = roundl(nindividuals * nattributes * mtax)
+                    
+                    while (nmutants > 0) {
+                        mi = roundl(random() * nindividuals * nattributes)
+                        if (!mutants[mi]) {
+                            mutants[mi] = 1
+                            nmutants = nmutants - 1
+                        }
+                    }
+                    
+                    for (i = 1; i < dim_i; i = i + 1) {
+                        node1 = split(adj[i, 0], ",")
+                        
+                        # For each chromosome(chain of attributes), a mutation is done
+                        # based on mutation tax...
+                        for (index = 1; index <= nattributes; index = index + 1) {
+                            if (mutants[i * index]) {
+                                if (binary_code) {
+                                    if (node1[index] == 0) {
+                                        node1[index] = 1
+                                    } else {
+                                        node1[index] = 0
+                                    }
+                                } else {
+                                    code_index = roundl(random() * (nsymbols - 1))
+                                    
+                                    node1[index] = codes[code_index]
+                                }
+                                
+                                # Became a mutant...
+                                attr = tostring(node1)
+                                adj[i, 0] = attr
+                                adj[0, i] = attr
+                            }
+                        }
+                    }
+                }
+            }
+            # Connect or disconnect nodes based on the affinity tax...        
+            for (i = 1; i < dim_i; i = i + 1) {
+                for (j = 1; j < dim_j; j = j + 1) {
+                    if (i != j) {
+                        node1 = split(adj[i, 0], ",")
+                        node2 = split(adj[0, j], ",")
+                        
+                        c = 0
+                        
+                        for (index = 1; index <= nattributes; index = index + 1) {
+                            if (exact) {
+                                if (node1[index] == node2[index]) {
+                                    c = c + 1
+                                }
+                            } else {
+                                if ((node1[index] != empty_symbol) && (node2[index] != empty_symbol)) {
+                                    if (node1[index] == node2[index]) {
+                                        c = c + 1
+                                    }
+                                }
+                            }
+                        }
+
+                        if (((c * 1.0) / nattributes) >= atax) {
+                            adj[i, j] = 1
+                        } else {
+                            adj[i, j] = 0
+                        }
+                    }
+                }
+            }
+        } elseif (method == "elite") {
+            # For it generation we must found the best adapted individual(vertice).
+            # For now, the best individual is the one who has the greater degree centrality.
+            
+            # Calculate vertex degrees...
+            degrees = CNA_Degrees(adj)
+
+            # Calculate vertex degrees...
+            hist = CNA_Degrees(adj)
+
+            # Calculate average degree...
+            avgdeg = CNA_AverageDegree(hist)
+            
+            if (mode == "individual") {
+                # Perform a crossover...
+                if (ctax > 0) {
+                    # Select the descendants individuals...
+                    descendants = matrix(0, nindividuals + 1)
+                    
+                    ndescendants = roundl(nindividuals * ctax)
+                    
+                    while (ndescendants > 0) {
+                        di = roundl(random() * nindividuals)
+                        
+                        # The best individual will survive...
+                        if (!descendants[di]) {
+                            descendants[di] = 1
+                            ndescendants = ndescendants - 1
+                        }
+                    }
+                    
+                    for (i = 1; i < dim_i; i = i + 1) {
+                        for (j = 1; j < dim_j; j = j + 1) {
+                            if ((i != j) && (adj[i, j] == 1)) {
+                                node1 = split(adj[i, 0], ",")
+                                node2 = split(adj[0, j], ",")
+                                
+                                # For each couple of chromosomes(chains of attributes), a crossover is done
+                                # based on a random attribute selection...
+                                for (index = 1; index <= nattributes; index = index + 1) {
+                                    pcross = random()
+                                    
+                                    if (pcross >= 0.5) {
+                                        temp = node1[index]
+                                        node1[index] = node2[index]
+                                        node2[index] = temp
+                                        
+                                    }
+                                }
+                                # The best individual will survive...
+                                if ((degrees[i, 2] <= avgdeg) && descendants[i]) {
+                                    adj[i, 0] = tostring(node1)
+                                }
+                                if ((degrees[j, 2] <= avgdeg) && descendants[j]) {
+                                    adj[0, j] = tostring(node2)
+                                }
+                            }
+                        }
+                    }
+                }
+                # Perform mutations on vertices...
+                if (mtax > 0) {
+                    # Select the mutant individuals...
+                    mutants = matrix(0, nindividuals + 1)
+                    
+                    nmutants = roundl(nindividuals * mtax)
+                    
+                    while (nmutants > 0) {
+                        mi = roundl(random() * nindividuals)
+                        
+                        # The best individual will survive...
+                        if (!mutants[mi]) {
+                            mutants[mi] = 1
+                            nmutants = nmutants - 1
+                        }
+                    }
+                    
+                    for (i = 1; i < dim_i; i = i + 1) {
+                        if (mutants[i]) {
+                            node1 = split(adj[i, 0], ",")
+                            
+                            # For each chromosome(chain of attributes), a mutation is done
+                            # based on mutation tax...
+                            for (index = 1; index <= nattributes; index = index + 1) {
+                                psel = random()
+                                
+                                if (binary_code) {
+                                    if (psel >= 0.5) {
+                                        if (node1[index] == 0) {
+                                            node1[index] = 1
+                                        } else {
+                                            node1[index] = 0
+                                        }
+                                    }
+                                } else {
+                                    code_index = roundl(random() * (nsymbols - 1))
+                                    
+                                    if (psel >= 0.5) {
+                                        node1[index] = codes[code_index]
+                                    }
+                                }
+                            }
+                            # Became a mutant...
+                            attr = tostring(node1)
+                            adj[i, 0] = attr
+                            adj[0, i] = attr
+                        }
+                    }
+                }
+            } elseif (mode == "gene") {
+                # Perform a crossover...
+                if (ctax > 0) {
+                    # Select the descendants individuals...
+                    descendants = matrix(0, nindividuals * nattributes + 1)
+                    
+                    ndescendants = roundl(nindividuals * nattributes * ctax)
+                    
+                    while (ndescendants > 0) {
+                        di = roundl(random() * nindividuals * nattributes)
+                        
+                        # The best individual will survive...
+                        if (!descendants[di]) {
+                            descendants[di] = 1
+                            ndescendants = ndescendants - 1
+                        }
+                    }
+                    
+                    for (i = 1; i < dim_i; i = i + 1) {
+                        for (j = 1; j < dim_j; j = j + 1) {
+                            if ((i != j) && (adj[i, j] == 1)) {
+                                node1 = split(adj[i, 0], ",")
+                                node2 = split(adj[0, j], ",")
+                                
+                                # For each couple of chromosomes(chains of attributes), a crossover is done
+                                # based on a random attribute selection...
+                                for (index = 1; index <= nattributes; index = index + 1) {
+                                    # The best individual will survive...
+                                    if ((degrees[i, 2] <= avgdeg) && descendants[i * index]) {
+                                        node1[index] = node2[index]
+                                        
+                                        adj[i, 0] = tostring(node1)
+                                    }
+                                    if ((degrees[j, 2] <= avgdeg) && descendants[j * index]) {
+                                        node2[index] = node1[index]
+                                        
+                                        adj[0, j] = tostring(node2)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                # Perform mutations on vertices...
+                if (mtax > 0) {
+                    # Select the mutant individuals...
+                    mutants = matrix(0, nindividuals * nattributes + 1)
+                    
+                    nmutants = roundl(nindividuals * nattributes * mtax)
+                    
+                    while (nmutants > 0) {
+                        mi = roundl(random() * nindividuals * nattributes)
+                        
+                        # The best individual will survive...
+                        if (!mutants[mi]) {
+                            mutants[mi] = 1
+                            nmutants = nmutants - 1
+                        }
+                    }
+                    
+                    for (i = 1; i < dim_i; i = i + 1) {
+                        # The best individual will survive...
+                        if (degrees[i, 2] <= avgdeg) {
+                            node1 = split(adj[i, 0], ",")
+                            
+                            # For each chromosome(chain of attributes), a mutation is done
+                            # based on mutation tax...
+                            for (index = 1; index <= nattributes; index = index + 1) {
+                                if (mutants[i * index]) {
+                                    if (binary_code) {
+                                        if (node1[index] == 0) {
+                                            node1[index] = 1
+                                        } else {
+                                            node1[index] = 0
+                                        }
+                                    } else {
+                                        code_index = roundl(random() * (nsymbols - 1))
+                                        
+                                        node1[index] = codes[code_index]
+                                    }
+                                    
+                                    # Became a mutant...
+                                    attr = tostring(node1)
+                                    adj[i, 0] = attr
+                                    adj[0, i] = attr
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            # Connect or disconnect nodes based on the affinity tax...        
+            for (i = 1; i < dim_i; i = i + 1) {
+                for (j = 1; j < dim_j; j = j + 1) {
+                    if (i != j) {
+                        node1 = split(adj[i, 0], ",")
+                        node2 = split(adj[0, j], ",")
+                        
+                        c = 0
+                        
+                        for (index = 1; index <= nattributes; index = index + 1) {
+                            if (exact) {
+                                if (node1[index] == node2[index]) {
+                                    c = c + 1
+                                }
+                            } else {
+                                if ((node1[index] != empty_symbol) && (node2[index] != empty_symbol)) {
+                                    if (node1[index] == node2[index]) {
+                                        c = c + 1
+                                    }
+                                }
+                            }
+                        }
+
+                        if (((c * 1.0) / nattributes) >= atax) {
+                            adj[i, j] = 1
+                        } else {
+                            adj[i, j] = 0
+                        }
+                    }
+                }
+            }
+        }
+        
+        # Take a snapshot...
+        if (snapshots) {
+            # Save the network file...
+            if (nsamples > 1) {
+                CNA_SaveFile(sprefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", nf) + "-" + prefix + "-" + sprintf("%0" + length(toString(ngen)) + "." + length(toString(ngen)) + "d", n) + ".net", adj)
+            } else {
+                CNA_SaveFile(prefix + "-" + sprintf("%0" + length(toString(ngen)) + "." + length(toString(ngen)) + "d", n) + ".net", adj)
+            }
+        }
+        
+        # Get the current time...
+        tg2 = time();
+        
+        # Show the elapsed time...
+        printf("Elapsed time to get this generation: %.3f seconds\n", tg2 - tg1)
+        
+        # Log the elapsed time...
+        if (log_file != "noname") {
+            fputs(sprintf("%d\t%d\t%.3f\n", nf, n, tg2 - tg1), fl)
+        }
+    }
+    
+    # Save the network file...
+    CNA_SaveFile(output_file, adj)
+    
+    # Get the current time...
+    ts2 = time();
+    
+    # Show the elapsed time...
+    printf("Elapsed time to generate this sample: %.3f seconds\n\n", ts2 - ts1)
+}
+
+# Close the log file...
+if (log_file != "noname") {
+    fclose(fl)
+}
+
+# Get the current time...
+t2 = time();
+
+# Show the elapsed time...
+printf("Elapsed time to generate %d samples: %.3f seconds\n\n", nsamples, t2 - t1)
+

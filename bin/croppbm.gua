@@ -1,0 +1,167 @@
+#!/usr/local/bin/guash
+#
+# croppbm.gua
+#
+#     This script resizes a PBM file.
+#
+# Copyright (C) 2012 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: croppbm.gua,v 1.0 2012/12/04 16:24:00 monteiro Exp $
+#
+
+function CNA_LoadPBM(file_name) {
+    fp = fopen(file_name, "r")
+
+    image_type = "none"
+    image_size = "none"
+    
+    y = 0
+    
+    while (!feof(fp)) {
+        if((line = fgets(fp)) == NULL) { 
+            break
+        }
+
+        if (image_type == "none") {
+            image_type = trim(line, " \t\r\n")
+            if (image_type == "P1") {
+                continue
+            } else {
+                return(NULL)
+            }
+        }
+        
+        if (image_size == "none") {
+            image_size = split(trim(line, " \t\r\n"))
+            dim_y = eval(image_size[0])
+            dim_x = eval(image_size[1])
+            if (length(image_size) == 2) {
+                pixmap = matrix(0, dim_y, dim_x)
+                continue
+            } else {
+                return(NULL)
+            }
+        }
+        
+        image_line = split(trim(line, " \t\r\n"))
+        
+        foreach (image_line; x; color) {
+            if (length(color) > 0) {
+                pixmap[y, x] = eval(color)
+            }
+        }
+        
+        if (y < (dim_y - 1)) {
+            y = y + 1
+        } else {
+            break
+        }
+    }
+    
+    fp = fclose(fp)
+    
+    return(pixmap)
+}
+
+function CNA_SavePBM(filename, adj, w = 0, h = 0) {
+    dim_adj = dim(adj)
+    dim_i = dim_adj[0]
+    dim_j = dim_adj[1]
+    
+    # Resizes the image...
+    if (w != 0) {
+        dim_i = w + 1
+    }
+    
+    if (h != 0) {
+        dim_j = h + 1
+    }
+    
+    fp = fopen(filename, "w")
+    
+    # Save the Netpbm format type and the image size...
+    fputs("P1\n" , fp)
+    fputs("" + (dim_j - 1) + " " + (dim_i - 1) + "\n" , fp)
+    
+    # Save the PBM matrix...
+    for (i = 1; i < dim_i; i = i + 1) {
+        for (j = 1; j < dim_j; j = j + 1) {
+            fputs(adj[i, j] + " ", fp)
+        }
+        fputs("\n", fp)
+    }
+    
+    fp = fclose(fp)
+}
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "noname"
+width = 0
+height = 0
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: calcfract option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: calcfract option1 value1 [option1 value1]")
+        println("-h    --help      show the options sumary")
+        println("-i                input file")
+        println("      --width     image width")
+        println("      --height    image height")
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "--width") {
+        i = i + 1
+        width = eval(argv[i])
+    } elseif (argv[i] == "--height") {
+        i = i + 1
+        height = eval(argv[i])
+    }
+    i = i + 1
+} 
+
+# Get the current time...
+t1 = time();
+
+println("Processing file" + input_file + "...\n")
+pixmap = CNA_LoadPBM(input_file)
+
+println("Resizing the image...\n")
+CNA_SavePBM(output_file, pixmap, width, height)
+
+# Get the current time...
+t2 = time();
+
+# Show the elapsed time...
+printf("Elapsed time to process file: %.3f seconds\n\n", t2 - t1)
+

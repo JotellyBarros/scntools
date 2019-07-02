@@ -1,0 +1,352 @@
+#!/usr/local/bin/guash
+#
+# csvavg.gua
+#
+#     This script calculates the average CSV file, from a set of CSV files.
+#
+# Copyright (C) 2011 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: csvavg.gua,v 1.1 2012/02/13 12:50:00 monteiro Exp $
+#
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+average_file = "average.csv"
+deviation_file = "deviation.csv"
+error_file = "error.csv"
+log_file = "noname"
+prefix = "sample"
+sufix = ""
+nfiles = 1
+index_from = 1
+index_to = 1
+index_in = 1
+separator = ","
+first_line = 0
+last_line = -1
+nlines = -1
+nrows = 0
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: csvavg option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: csvavg option1 value1 [option1 value1]")
+        println("-h    --help         show the options sumary")
+        println("-l                   log file")
+        println("      --oavg         average output file")
+        println("      --odev         deviation output file")
+        println("      --oerr         standard error output file")
+        println("      --prefix       prefix for multiple file creation(default=\"sample\")")
+        println("      --sufix        sufix for multiple file creation(default=\"\")")
+        println("      --nfiles       number of files for multiple file creation")
+        println("      --from         first file index for multiple file creation")
+        println("      --to           last file index for multiple file creation")
+        println("      --in           total number of files in the file set")
+        println("      --separator    column separator(default=\",\")")
+        println("      --first        first line to read(default=0)")
+        println("      --last         last line to read")
+        println("-n                   number of lines to read")
+        println("      --nrows        max number of rows")
+        
+        exit(0)
+    } elseif (argv[i] == "-l") {
+        i = i + 1
+        log_file = argv[i]
+    } elseif (argv[i] == "--oavg") {
+        i = i + 1
+        average_file = argv[i]
+    } elseif (argv[i] == "--odev") {
+        i = i + 1
+        deviation_file = argv[i]
+    } elseif (argv[i] == "--oerr") {
+        i = i + 1
+        error_file = argv[i]
+    } elseif (argv[i] == "--prefix") {
+        i = i + 1
+        prefix = argv[i]
+    } elseif (argv[i] == "--sufix") {
+        i = i + 1
+        sufix = argv[i]
+    } elseif (argv[i] == "--nfiles") {
+        i = i + 1
+        nfiles = eval(argv[i])
+    } elseif (argv[i] == "--from") {
+        i = i + 1
+        index_from = eval(argv[i])
+    } elseif (argv[i] == "--to") {
+        i = i + 1
+        index_to = eval(argv[i])
+    } elseif (argv[i] == "--in") {
+        i = i + 1
+        index_in = eval(argv[i])
+    } elseif (argv[i] == "--separator") {
+        i = i + 1
+        separator = argv[i]
+    } elseif (argv[i] == "--first") {
+        i = i + 1
+        first_line = eval(argv[i])
+    } elseif (argv[i] == "--last") {
+        i = i + 1
+        last_line = eval(argv[i])
+    } elseif (argv[i] == "-n") {
+        i = i + 1
+        nlines = eval(argv[i])
+    } elseif (argv[i] == "--nrows") {
+        i = i + 1
+        nrows = eval(argv[i])
+    }
+    i = i + 1
+} 
+
+# Get the current time...
+t1 = time();
+
+# Create the log file...
+if (log_file != "noname") {
+    fl = fopen(log_file, "w")
+}
+
+# Calculate the file index number range...
+if (index_from < 1) {
+    index_from = 1
+}
+if (index_to <= 1) {
+    if (nfiles > 1) {
+        index_to = index_from + nfiles - 1
+    }
+}
+nfiles = index_to - index_from + 1
+if (index_in <= 1) {
+    index_in = nfiles
+}
+
+# Calculate the line number range...
+if (first_line < 0) {
+    first_line = 0
+}
+if (last_line < 0) {
+    if (nlines > 1) {
+        last = first_line + nlines - 1
+    }
+}
+if (last_line > -1) {
+    nlines = last_line - first_line + 1
+}
+
+# Read the first file and get the mavg, mdev, msx, msx2 and mn matrices size...
+input_file = prefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", index_from) + sufix + ".csv"
+
+fp = fopen(input_file, "r")
+
+# Get the matrix columns number...
+m = 0
+if (!feof(fp)) {
+    if ((line = fgets(fp)) != NULL) {
+        if (separator != " ") {
+            record = split(trim(line, " \t\n"), separator)
+        } else {
+            record = split(trim(line, " \t\n"))
+        }
+        m = length(record)
+    }
+}
+# Get the matrix rows number...
+if (m > 0) {
+    n = 1
+    while (!feof(fp)) {
+        if ((line = fgets(fp)) == NULL) { 
+            break
+        }
+        n = n + 1
+    }
+} else {
+    println("Error: the input file has no row.")
+    exit(1)
+}
+
+fp = fclose(fp)
+
+if (nrows > n) {
+    n = nrows
+}
+
+# Create the mavg, mdev, msx, msx2 and mn matrices...
+mavg = matrix(0.0, n, m)
+mdev = matrix(0.0, n, m)
+msx = matrix(0.0, n, m)
+msx2 = matrix(0.0, n, m)
+mn = matrix(0.0, n, m)
+
+println("Processing " + nfiles + " files...\n")
+
+max_line = 0
+
+# Start file processing...
+for (nf = index_from; nf <= index_to; nf = nf + 1) {
+    # Get the current time...
+    ts1 = time();
+    
+    if (nfiles > 1) {
+        input_file = prefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", nf) + sufix + ".csv"
+    }
+    
+    println("Processing file " + input_file + "...")
+    
+    try {
+        fp = fopen(input_file, "r")
+        
+        row = 0
+        
+        while (!feof(fp)) {
+            if ((line = fgets(fp)) == NULL) {
+                break
+            }
+            
+            if (separator != " ") {
+                record = split(trim(line, " \t\n"), separator)
+            } else {
+                record = split(trim(line, " \t\n"))
+            }
+            
+            if (row >= first_line) {
+                if (nlines >= 1) {
+                    if (row < nlines) {
+                        foreach(record; column; value) {
+                            x = eval(value)
+                            msx[row, column] = msx[row, column] + x
+                            msx2[row, column] = msx2[row, column] + x * x
+                            mn[row, column] = mn[row, column] + 1
+                        }
+                    }
+                } else {
+                    foreach(record; column; value) {
+                        x = eval(value)
+                        msx[row, column] = msx[row, column] + x
+                        msx2[row, column] = msx2[row, column] + x * x
+                        mn[row, column] = mn[row, column] + 1
+                    }
+                }
+            }
+            
+            if (row > max_line) {
+                max_line = row
+            }
+            
+            row = row + 1
+        }
+        
+        fp = fclose(fp)
+    }
+    
+    # Get the current time...
+    ts2 = time();
+    
+    # Show the elapsed time...
+    printf("Elapsed time to process this file: %.3f seconds\n\n", ts2 - ts1)
+    
+    # Log the elapsed time...
+    if (log_file != "noname") {
+        fputs(sprintf("%d\t%.3f\n", nf, ts2 - ts1), fl)
+    }
+}
+
+# Close the log file...
+if (log_file != "noname") {
+    fclose(fl)
+}
+
+# Calculate the averages and deviations...
+for (i = 0; i <= max_line; i = i + 1) {
+    if (i >= first_line) {
+        if (nlines >= 1) {
+            if (i < nlines) {
+                for (j = 0; j < m; j = j + 1) {
+                    mavg[i, j] = msx[i, j] / mn[i, j]
+                    mdev[i, j] = sqrt((msx2[i, j] - (msx[i, j] * msx[i, j]) / mn[i, j]) / (mn[i, j] - 1))
+                }
+            }
+        } else {
+            for (j = 0; j < m; j = j + 1) {
+                mavg[i, j] = msx[i, j] / mn[i, j]
+                mdev[i, j] = sqrt((msx2[i, j] - (msx[i, j] * msx[i, j]) / mn[i, j]) / (mn[i, j] - 1))
+            }
+        }
+    }
+}
+
+fa = fopen(average_file, "w")
+fd = fopen(deviation_file, "w")
+fe = fopen(error_file, "w")
+
+# Save the averages and deviations...
+for (i = 0; i < max_line; i = i + 1) {
+    if (i >= first_line) {
+        if (nlines >= 1) {
+            if (i < nlines) {
+                avg_record = ""
+                dev_record = ""
+                err_record = ""
+                
+                for (j = 0; j < m; j = j + 1) {
+                    avg_record = avg_record + toString(mavg[i, j]) + ","
+                    dev_record = dev_record + toString(mdev[i, j]) + ","
+                    err_record = err_record + toString(mdev[i, j] / sqrt(mn[i, j])) + ","
+                }
+                
+                fputs(trim(avg_record, ",") + "\n", fa)
+                fputs(trim(dev_record, ",") + "\n", fd)
+                fputs(trim(err_record, ",") + "\n", fe)
+            }
+        } else {
+            avg_record = ""
+            dev_record = ""
+            err_record = ""
+            
+            for (j = 0; j < m; j = j + 1) {
+                avg_record = avg_record + toString(mavg[i, j]) + ","
+                dev_record = dev_record + toString(mdev[i, j]) + ","
+                err_record = err_record + toString(mdev[i, j] / sqrt(mn[i, j])) + ","
+            }
+            
+            fputs(trim(avg_record, ",") + "\n", fa)
+            fputs(trim(dev_record, ",") + "\n", fd)
+            fputs(trim(err_record, ",") + "\n", fe)
+        }
+    }
+}
+
+fclose(fa)
+fclose(fd)
+fclose(fe)
+
+# Get the current time...
+t2 = time();
+
+# Show the elapsed time...
+printf("Elapsed time to process %d files: %.3f seconds\n\n", nfiles, t2 - t1)
+

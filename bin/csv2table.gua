@@ -1,0 +1,380 @@
+#!/usr/local/bin/guash
+#
+# csv2table.gua
+#
+#     This script converts a CSV file to a csv or latex table.
+#
+# Copyright (C) 2012 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: csv2table.gua,v 1.0 2012/03/20 15:07:00 monteiro Exp $
+#
+
+#
+# Configuration variables.
+#
+input_files_list = ""
+input_file = ""
+output_file = "output.csv"
+output_format = "csv"
+isep = ","
+osep = ","
+columns = ""
+stoponblank = FALSE
+first_line = 0
+last_line = -1
+nlines = -1
+table_cols_labels = ""
+table_cformat = ""
+table_dformat = ""
+table_eval_cols = ""
+table_rows_labels = ""
+table_caption = ""
+table_label = ""
+table_center = FALSE
+table_tiny = FALSE
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: csv2table option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: csv2table option1 value1 [option1 value1]")
+        println("-h    --help           show the options sumary")
+        println("-i                     list of input files")
+        println("-o                     output file")
+        println("-f                     output file format(default=\"csv\")")
+        println("      --isep           input files column separator(default=\",\")")
+        println("      --osep           output file column separator(default=\",\")")
+        println("      --columns        list of columns to copy")
+        println("      --first          first line to read(default=0)")
+        println("      --last           last line to read")
+        println("-n                     number of lines to read")
+        println("      --stoponblank    stop on first blank line")
+        println("      --caption        table caption")
+        println("      --colslabels     columns labels list")
+        println("      --cformat        columns format list(LaTeX like)")
+        println("      --dformat        columns data format list(C like)")
+        println("      --evalcols       columns to be evaluated as GuaráScript")
+        println("      --rowslabels     rows labels list")
+        println("      --label          table label")
+        println("      --center         center table")
+        println("      --tiny           use the smallest font available")
+        
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_files_list = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "-f") {
+        i = i + 1
+        output_format = argv[i]
+    } elseif (argv[i] == "--isep") {
+        i = i + 1
+        isep = argv[i]
+    } elseif (argv[i] == "--osep") {
+        i = i + 1
+        osep = argv[i]
+    } elseif (argv[i] == "--columns") {
+        i = i + 1
+        columns = argv[i]
+    } elseif (argv[i] == "--first") {
+        i = i + 1
+        first_line = eval(argv[i])
+    } elseif (argv[i] == "--last") {
+        i = i + 1
+        last_line = eval(argv[i])
+    } elseif (argv[i] == "-n") {
+        i = i + 1
+        nlines = eval(argv[i])
+    } elseif (argv[i] == "--stoponblank") {
+        stoponblank = TRUE
+    } elseif (argv[i] == "--caption") {
+        i = i + 1
+        table_caption = argv[i]
+    } elseif (argv[i] == "--colslabels") {
+        i = i + 1
+        table_cols_labels = argv[i]
+    } elseif (argv[i] == "--cformat") {
+        i = i + 1
+        table_cformat = argv[i]
+    } elseif (argv[i] == "--dformat") {
+        i = i + 1
+        table_dformat = argv[i]
+    } elseif (argv[i] == "--evalcols") {
+        i = i + 1
+        table_eval_cols = argv[i]
+    } elseif (argv[i] == "--rowslabels") {
+        i = i + 1
+        table_rows_labels = argv[i]
+    } elseif (argv[i] == "--label") {
+        i = i + 1
+        table_label = argv[i]
+    } elseif (argv[i] == "--center") {
+        table_center = TRUE
+    } elseif (argv[i] == "--tiny") {
+        table_tiny = TRUE
+    }
+    i = i + 1
+} 
+
+# Get the current time...
+t1 = time();
+
+# Create the output file...
+fo = fopen(output_file, "w")
+
+# Get the input files list...
+flist = split(trim(input_files_list), ",")
+
+# Get the table properties...
+cols_labels_list = split(table_cols_labels, ",")
+cformat_list = split(table_cformat, ",")
+dformat_list = split(table_dformat, ",")
+eval_cols_list = split(table_eval_cols, ",")
+rows_labels_list = split(table_rows_labels, ",")
+
+# Add the LaTeX table declaration...
+if (output_format == "latex") {
+    fputs("\\begin{table}[!htbp]\n", fo)
+    if (length(table_caption) > 0) {
+        fputs("\\caption{" + table_caption + "}\n", fo)
+    }
+    if (table_center) {
+        fputs("\\begin{center}\n", fo)
+    }
+    if (table_tiny) {
+        fputs("\\tiny\n", fo)
+    }
+    
+    if (length(table_cformat) > 0) {
+        data = "|"
+        foreach(cformat_list; col_index; col_format) {
+            data = data + " " + col_format + " |"
+        }
+        data = "\\begin{tabular}{" + data + "}\n"
+    } else {
+        data = "\\begin{tabular}\n"
+    }
+    data = data + "\\hline\n"
+    
+    fputs(data, fo)
+}
+
+# Add the columns labels...
+if (length(table_cols_labels) > 0) {
+    if (output_format == "csv") {
+        data = ""
+        foreach(cols_labels_list; col_index; col_label) {
+            data = data + "\"" + trim(col_label) + "\"" + osep
+        }
+        data = trim(data, osep) + "\n"
+        
+        fputs(data, fo)
+    }
+    if (output_format == "latex") {
+        data = ""
+        foreach(cols_labels_list; col_index; col_label) {
+            data = data + " " + trim(col_label) + " " + "&"
+        }
+        data = trim(data, " &") + " \\\\\n"
+        data = data + "\\hline\n"
+        
+        fputs(data, fo)
+    }
+}
+
+# Process each input file...
+foreach (flist; findex; input_file) {
+    # Calculate the line number range...
+    if (first_line < 0) {
+        first_line = 0
+    }
+    if (last_line < 0) {
+        if (nlines > 0) {
+            last_line = first_line + nlines
+        }
+    }
+    if (last_line > -1) {
+        n = last_line - first_line
+    } else {
+        n = -1
+    }
+    
+    # Open the input file...
+    fi = fopen(input_file, "r")
+    
+    println("Processing file " + input_file + "...\n")
+
+    row = 0
+
+    if (length(columns) > 0) {
+        columns_list = split(trim(columns, " \t\n"), ",")
+    }
+    
+    while (!feof(fi)) {
+        if ((line = fgets(fi)) == NULL) {
+            break
+        }
+        
+        if (trim(line, " \t\n") != "") {
+            if (isep != " ") {
+                record = split(trim(line, " \t\n"), isep)
+            } else {
+                record = split(trim(line, " \t\n"))
+            }
+            
+            if (row >= first_line) {
+                if (stoponblank) {
+                    if (trim(line, " \t\n") == "") {
+                        break
+                    }
+                }
+                if (nlines > -1) {
+                    if (n > 0) {
+                        if (output_format == "csv") {
+                            if (length(columns) > 0) {
+                                data = ""
+                                foreach(columns_list; index; column) {
+                                    col = eval(column)
+                                    data = data + record[col] + osep
+                                }
+                                data = trim(data, osep) + "\n"
+                            } else {
+                                data = line
+                            }
+                            
+                            fputs(data, fo)
+                        }
+                        if (output_format == "latex") {
+                            if (length(columns) > 0) {
+                                data = ""
+                                foreach(columns_list; index; column) {
+                                    col = eval(column)
+                                    if (search(eval_cols_list, column) != NULL) {
+                                        data = data + " " + eval(record[col]) + " " + "&"
+                                    } else {
+                                        data = data + " " + record[col] + " " + "&"
+                                    }
+                                }
+                                data = trim(data, " &") + " \\\\\n"
+                                data = data + "\\hline\n"
+                            } else {
+                                data = ""
+                                foreach(record; index; column) {
+                                    if (search(eval_cols_list, toString(index)) != NULL) {
+                                        data = data + " " + eval(column) + " " + "&"
+                                    } else {
+                                        data = data + " " + column + " " + "&"
+                                    }
+                                }
+                                data = trim(data, " &") + " \\\\\n"
+                                data = data + "\\hline\n"
+                            }                            
+                            fputs(data, fo)
+                        }
+                        
+                        n = n - 1
+                    }
+                } else {
+                    if (output_format == "csv") {
+                        if (length(columns) > 0) {
+                            data = ""
+                            foreach(columns_list; index; column) {
+                                col = eval(column)
+                                data = data + record[col] + osep
+                            }
+                            data = trim(data, osep) + "\n"
+                        } else {
+                            data = line
+                        }
+                        
+                        fputs(data, fo)
+                    }
+                    if (output_format == "latex") {
+                        if (length(columns) > 0) {
+                            data = ""
+                            foreach(columns_list; index; column) {
+                                col = eval(column)
+                                if (search(eval_cols_list, column) != NULL) {
+                                    data = data + " " + eval(record[col]) + " " + "&"
+                                } else {
+                                    data = data + " " + record[col] + " " + "&"
+                                }
+                            }
+                            data = trim(data, " &") + " \\\\\n"
+                            data = data + "\\hline\n"
+                        } else {
+                            data = ""
+                            foreach(record; index; column) {
+                                if (search(eval_cols_list, toString(index)) != NULL) {
+                                    data = data + " " + eval(column) + " " + "&"
+                                } else {
+                                    data = data + " " + column + " " + "&"
+                                }
+                            }
+                            data = trim(data, " &") + " \\\\\n"
+                            data = data + "\\hline\n"
+                        }                            
+                        fputs(data, fo)
+                    }
+                }
+            }
+        } else {
+            if (row >= first_line) {
+                if (stoponblank) {
+                    if (trim(line, " \t\n") == "") {
+                        break
+                    }
+                }
+            }
+        }
+        
+        row = row + 1
+    }
+    
+    fclose(fi)
+}
+
+if (output_format == "latex") {
+    fputs("\\end{tabular}\n", fo)
+    if (table_tiny) {
+        fputs("\\normalsize\n", fo)
+    }
+    if (table_center) {
+        fputs("\\end{center}\n", fo)
+    }
+    fputs("\\label{" + table_label + "}\n", fo)
+    fputs("\\end{table}\n", fo)
+}
+
+fclose(fo)
+
+# Get the current time...
+t2 = time();
+
+# Show the elapsed time...
+printf("Elapsed time to process file %s: %.3f seconds\n\n", input_file, t2 - t1)
+

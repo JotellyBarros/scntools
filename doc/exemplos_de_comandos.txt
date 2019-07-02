@@ -1,0 +1,37 @@
+I) Criação de redes artificiais:
+
+1) Para criar 1 rede aleatória, com 100 vértices e grau médio 3:
+../../bin/mknet.gua -o random.net -t edges --topology random -n 100 -d 3 --tseed
+
+2) Para criar 10 redes aleatórias, com 100 vértices e grau médio 3:
+../../bin/mknet.gua --prefix random --nfiles 10 -t edges --topology random -n 100 -d 3 --tseed
+
+3) Para criar 10 redes aleatórias, com 100 vértices e grau médio variando de 1 a 5:
+../../bin/mknet.gua --prefix random-deg --nfiles 10 -t edges --topology random -n 100 -d 1 --step 0.5 --tseed
+
+4) Para criar 1 rede de mundo pequeno, com 100 vértices e grau médio 4 e probabilidade de reconexão de arestas de 60%:
+../../bin/mknet.gua -o smallworld.net -t edges --topology smallworld -n 100 -d 4 -p 0.6 --tseed
+
+5) Para criar 10 redes de mundo pequeno, com 100 vértices e grau médio 4 e probabilidade de reconexão de arestas de 60%:
+../../bin/mknet.gua --prefix smallworld --nfiles 10 -t edges --topology smallworld -n 100 -d 4 -p 0.6 --tseed
+
+6) Para criar 10 redes de mundo pequeno, com 100 vértices e grau médio variando de 4 a 8 e probabilidade de reconexão de arestas de 60%:
+../../bin/mknet.gua --prefix smallworld-deg --nfiles 10 -t edges --topology smallworld -n 100 -d 4 -p 0.6 --step 0.5 --tseed
+
+7) Para criar 1 rede livre de escala, com 100 vértices e grau médio 3:
+../../bin/mknet.gua -o scalefree.net -t edges --topology scalefree -n 100 -d 3 --tseed
+
+8) Para criar 10 redes livre de escala, com 100 vértices e grau médio 3:
+../../bin/mknet.gua --prefix scalefree --nfiles 10 -t edges --topology scalefree -n 100 -d 3 --tseed
+
+9) Para criar 10 redes livre de escala, com 100 vértices e grau médio variando de 1 a 5:
+../../bin/mknet.gua --prefix scalefree-deg --nfiles 10 -t edges --topology scalefree -n 100 -d 1 --step 0.5 --tseed
+
+II) Construir uma rede de cliques:
+
+1) Construir uma rede de cliques a partir de um arquivo em formato DLF, no modo de crescimento de população:
+../../bin/snetdens.gua -i ../txt/semantic/test01.txt -o rede.net -t edges -l rede.log --mode clique --pg
+
+2) Construir uma rede de cliques a partir de um arquivo em formato DLF, no modo de crescimento de relacionamentos:
+../../bin/snetdens.gua -i ../txt/semantic/test01.txt -o rede-rg.net -t edges -l rede-rg.log --mode clique --rg
+

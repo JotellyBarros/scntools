@@ -1,0 +1,227 @@
+#!/usr/local/bin/guash
+#
+# txt2net.gua
+#
+#     This script creates a Pajek network file from a TXT network file.
+#
+# Copyright (C) 2011 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: txt2net.gua,v 1.1 2012/02/13 12:50:00 monteiro Exp $
+#
+
+function CNA_SaveFile(filename, adj, type = "edges") {
+    dim_adj = dim(adj)
+    dim_i = dim_adj[0]
+    dim_j = dim_adj[1]
+
+    # Each line in a Pajek files must terminate with CR+LF.
+    # Windows will automaticly converts "\n" to "\r\n", but
+    # Linux will not.
+    if ($SYS_HOST == "linux") {
+        new_line = "\r\n"
+    } else {
+        new_line = "\n"
+    }
+
+    fp = fopen(filename, "w")
+
+    # Save vertices...
+    fputs("*Vertices " + (dim_i - 1) + new_line, fp)
+    for (i = 1; i < dim_i; i = i + 1) {
+        fputs(i + " \"" + adj[i, 0] + "\"" + new_line, fp)
+    }
+
+    # Save edges...
+    if (type == "edges") {
+        fputs("*Edges" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                if (adj[i, j] != 0) {
+                    fputs(i + " " + j + " " + adj[i, j] + new_line, fp)
+                }
+            }
+        }
+    # Save arcs...
+    } elseif (type == "arcs") {
+        fputs("*Arcs" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                if (adj[i, j] != 0) {
+                    fputs(i + " " + j + " " + adj[i, j] + new_line, fp)
+                }
+            }
+        }
+    # Save matrix...
+    } elseif (type == "matrix") {
+        fputs("*Matrix" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                fputs(" " + adj[i, j], fp)
+            }
+            fputs(new_line, fp)
+        }
+    }
+
+    fp = fclose(fp)
+}
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "output.net"
+output_file_type = "edges"
+separator = " "
+c1 = 0
+c2 = 1
+ignore = "NULL"
+
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: txt2net option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: txt2net option1 value1 [option1 value1]")
+        println("-h    --help         show the options sumary")
+        println("-i                   input file")
+        println("-o                   output file")
+        println("-t                   output file type(default=edges)")
+        println("      --separator    column separator(default=\" \")")
+        println("      --c1           first column number(default=0)")
+        println("      --c2           second column number(default=1)")
+        println("      --ignore       ignore fields with patern(default=NULL)")
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "-t") {
+        i = i + 1
+        output_file_type = argv[i]
+    } elseif (argv[i] == "--separator") {
+        i = i + 1
+        separator = argv[i]
+    } elseif (argv[i] == "--c1") {
+        i = i + 1
+        c1 = eval(argv[i])
+    } elseif (argv[i] == "--c2") {
+        i = i + 1
+        c2 = eval(argv[i])
+    } elseif (argv[i] == "--ignore") {
+        i = i + 1
+        ignore = argv[i]
+    }
+    i = i + 1
+} 
+
+# Check if the input file name was suplied.
+if (input_file == "noname") {
+    println("Error: input file name is mandatory.")
+    exit(1)
+}
+
+# Get vertices...
+fp = fopen(input_file, "r")
+
+n = 0
+
+while (!feof(fp)) {
+    if ((line = fgets(fp)) == NULL) { 
+        break
+    }
+
+    if (separator != " ") {
+        record = split(trim(line, " \t\n"), separator)
+    } else {
+        record = split(trim(line, " \t\n"))
+    }
+    
+    column1 = record[c1]
+    column2 = record[c2]
+
+    if (column1 != ignore) {
+        if (exists("vertex")) {
+            if (search(keys(vertex), column1) == NULL) {
+                n = n + 1
+                vertex[column1] = n
+            }
+        } else {
+            n = n + 1
+            vertex[column1] = n
+        }
+    }
+    if (column2 != ignore) {
+        if (exists("vertex")) {
+            if (search(keys(vertex), column2) == NULL) {
+                n = n + 1
+                vertex[column2] = n
+            }
+        } else {
+            n = n + 1
+            vertex[column2] = n
+        }
+    }
+}
+
+fp = fclose(fp)
+
+nvertices = length(vertex)
+adj = matrix(0, nvertices + 1, nvertices + 1)
+
+foreach (vertex; n; v) {
+    adj[0, v] = n
+    adj[v, 0] = n    
+}
+
+# Build network...
+fp = fopen(input_file, "r")
+
+while (!feof(fp)) {
+    if((line = fgets(fp)) == NULL) { 
+        break
+    }
+    
+    if (separator != " ") {
+        record = split(trim(line, " \t\n"), separator)
+    } else {
+        record = split(trim(line, " \t\n"))
+    }
+    
+    column1 = record[c1]
+    column2 = record[c2]
+    
+    if (!((column1 == ignore) || (column2 == ignore))) {
+        adj[vertex[column1], vertex[column2]] = 1
+    }
+}
+
+fp = fclose(fp)
+
+CNA_SaveFile(output_file, adj, output_file_type)
+
+exit(0)
+

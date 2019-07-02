@@ -1,0 +1,846 @@
+#!/usr/local/bin/guash
+#
+# cnacalc.gua
+#
+#     This script calculates network parameters.
+#
+# Copyright (C) 2011 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: cnacalc.gua,v 2.0 2015/12/15 22:00:00 monteiro Exp $
+#
+
+# Set the package path.
+script_file = fsFullPath($argv[1]);
+script_path = fsPath(script_file);
+root_path = fsPath(script_path)
+pkg_path = root_path + "/lib"
+
+if (exists("SYS_PKG_PATH")) {
+    last = length(SYS_PKG_PATH)
+    SYS_PKG_PATH[last] = root_path + "/lib"
+} else {
+    SYS_PKG_PATH[0] = root_path + "/lib"
+}
+
+# Load the required packages.
+include("cna")
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "noname"
+output_file_type = "edges"
+log_file = "noname"
+report_file = "output.rep"
+csv_file = "noname"
+prefix = "network"
+nfiles = 1
+index_from = 1
+index_to = 1
+index_in = 1
+# Calculate all network parameters.
+calc_all = FALSE
+# Log the network parameters summary.
+calc_summary = FALSE
+# Print a title for each parameter on the log file.
+print_title = FALSE
+# Print a column names for each table on the log file.
+print_colnames = FALSE
+# Calculate statistics.
+calc_stat = FALSE
+# Calculate the network density.
+calc_density = FALSE
+# Calculate vertices degrees.
+calc_degrees = FALSE
+# Calculatet the degree distriution.
+calc_degdist = FALSE
+# Calculate the average vertex degree.
+calc_avgdeg = FALSE
+# Calculate the clustering coefficient matrix.
+calc_clustering = FALSE
+# Calculate the average clustering coefficient.
+calc_avgclustering = FALSE
+# Calculate the geodesics matrix.
+calc_geodesics = FALSE
+# Use Floyd-Warshall algorithm to calculate the shortest path.
+use_floydwarshall = FALSE
+# Calculate the average shortest path.
+calc_avgshortestpath = FALSE
+# Calculate the network diameter.
+calc_diameter = FALSE
+# Calculate the centrality matrix.
+calc_centrality = FALSE
+# Calculate the node efficiency matrix.
+calc_vertex_efficiency = FALSE
+# Calculate the average global efficiency.
+calc_global_efficiency = FALSE
+# Calculate the subgraph efficiency matrix.
+calc_subgraph_efficiency = FALSE
+# Calculate the Latora and Marchiori subgraph efficiency matrix.
+calc_latora_subgraph_efficiency = FALSE
+# Calculate the plasticity subgraph efficiency matrix.
+calc_plasticity_subgraph_efficiency = FALSE
+# Calculate the average local efficiency.
+calc_local_efficiency = FALSE
+# Calculate the average Latora and Marchiori local efficiency.
+calc_latora_local_efficiency = FALSE
+# Calculate the average plasticity local efficiency.
+calc_plasticity_local_efficiency = FALSE
+# Calculate the average network efficiency.
+print_adj = FALSE
+# Print vertex subgraph.
+print_subgraph = FALSE
+# It is a directed network.
+directed = FALSE
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: cnacalc option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: cnacalc option1 value1 [option1 value1]")
+        println("-h    --help                    show the options sumary")
+        println("-i                              input file")
+        println("-o                              output file")
+        println("-t                              output file type(default=edges)")
+        println("-l                              log file")
+        println("-r                              report file")
+        println("-c                              CSV file")
+        println("      --prefix                  prefix for multiple file calc.(default=\"network\")")
+        println("      --nfiles                  number of files for multiple file calculation")
+        println("      --from                    first file index for multiple file calculation")
+        println("      --to                      last file index for multiple file calculation")
+        println("      --in                      total number of files in the file set")
+        println("      --all                     calculate all network parameters")
+        println("      --summary                 log the network parameters summary")
+        println("      --title                   print a title for each parameter on the log file")
+        println("      --colnames                print the col. names for each table on the log file")
+        println("      --stat                    calculate statistics")
+        println("      --density                 calculate the network density")
+        println("      --degrees                 calculate vertices degrees")
+        println("      --degdist                 calculatet the degree distriution")
+        println("      --avgdeg                  calculate the average vertex degree")
+        println("      --clustering              calculate the clustering coefficient matrix")
+        println("      --avgclustering           calculate the average clustering coefficient")
+        println("      --geodesics               calculate the geodesics matrix")
+        println("      --floydwarshall           use Floyd-Warshall alg. to calc. the shortest path")
+        println("      --avgshortestpath         calculate the average shortest path")
+        println("      --diameter                calculate the network diameter")
+        println("      --centrality              calculate the centrality matrix")
+        println("      --vertexefficiency        calculate the vertex efficiency matrix")
+        println("      --globalefficiency        calculate the global efficiency")
+        println("      --subgraphefficiency      calculate the subgraph efficiency matrix")
+        println("      --latorasubgrapheff       calculate the Latora and Marchiori subgraph efficiency matrix")
+        println("      --localefficiency         calculate the local efficiency")
+        println("      --latoraefficiency        calculate the Latora and Marchiori local efficiency")
+        println("      --plasticityefficiency    calculate the plasticity local efficiency")
+        println("      --adj                     print the adjacency matrix on the log file")
+        println("      --subgraph                print vertex subgraph")
+        println("      --directed                it is a directed graph")
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "-t") {
+        i = i + 1
+        output_file_type = argv[i]
+    } elseif (argv[i] == "-l") {
+        i = i + 1
+        log_file = argv[i]
+    } elseif (argv[i] == "-r") {
+        i = i + 1
+        report_file = argv[i]
+    } elseif (argv[i] == "-c") {
+        i = i + 1
+        csv_file = argv[i]
+    } elseif (argv[i] == "--prefix") {
+        i = i + 1
+        prefix = argv[i]
+    } elseif (argv[i] == "--nfiles") {
+        i = i + 1
+        nfiles = eval(argv[i])
+    } elseif (argv[i] == "--from") {
+        i = i + 1
+        index_from = eval(argv[i])
+    } elseif (argv[i] == "--to") {
+        i = i + 1
+        index_to = eval(argv[i])
+    } elseif (argv[i] == "--in") {
+        i = i + 1
+        index_in = eval(argv[i])
+    } elseif (argv[i] == "--all") {
+        calc_all = TRUE
+    } elseif (argv[i] == "--summary") {
+        calc_summary = TRUE
+    } elseif (argv[i] == "--title") {
+        print_title = TRUE
+    } elseif (argv[i] == "--colnames") {
+        print_colnames = TRUE
+    } elseif (argv[i] == "--stat") {
+        calc_stat = TRUE
+    } elseif (argv[i] == "--density") {
+        calc_density = TRUE
+    } elseif (argv[i] == "--degrees") {
+        calc_degrees = TRUE
+    } elseif (argv[i] == "--degdist") {
+        calc_degdist = TRUE
+    } elseif (argv[i] == "--avgdeg") {
+        calc_avgdeg = TRUE
+    } elseif (argv[i] == "--clustering") {
+        calc_clustering = TRUE
+    } elseif (argv[i] == "--avgclustering") {
+        calc_avgclustering = TRUE
+    } elseif (argv[i] == "--geodesics") {
+        calc_geodesics = TRUE
+    } elseif (argv[i] == "--floydwarshall") {
+        use_floydwarshall = TRUE
+    } elseif (argv[i] == "--avgshortestpath") {
+        calc_avgshortestpath = TRUE
+    } elseif (argv[i] == "--diameter") {
+        calc_diameter = TRUE
+    } elseif (argv[i] == "--centrality") {
+        calc_centrality = TRUE
+    } elseif (argv[i] == "--vertexefficiency") {
+        calc_vertex_efficiency = TRUE
+    } elseif (argv[i] == "--globalefficiency") {
+        calc_global_efficiency = TRUE
+    } elseif (argv[i] == "--subgraphefficiency") {
+        calc_subgraph_efficiency = TRUE
+    } elseif (argv[i] == "--latorasubgrapheff") {
+        calc_latora_subgraph_efficiency = TRUE
+    } elseif (argv[i] == "--localefficiency") {
+        calc_local_efficiency = TRUE
+    } elseif (argv[i] == "--latoraefficiency") {
+        calc_latora_local_efficiency = TRUE
+    } elseif (argv[i] == "--plasticityefficiency") {
+        calc_plasticity_local_efficiency = TRUE
+    } elseif (argv[i] == "--adj") {
+        print_adj = TRUE
+    } elseif (argv[i] == "--subgraph") {
+        print_subgraph = TRUE
+    } elseif (argv[i] == "--directed") {
+        directed = TRUE
+    }
+    i = i + 1
+}
+
+# Get the current time...
+t1 = time();
+
+# Create the log file...
+if (log_file != "noname") {
+    fl = fopen(log_file, "w")
+}
+
+# Create the CSV file...
+if (csv_file != "noname") {
+    fc = fopen(csv_file, "w")
+}
+
+# Add a header to the CSV file...
+if (csv_file != "noname") {
+    fputs("\"vertices\"\t\"nedges\"\t\"density\"\t\"min_degree\"\t\"avgdeg\"\t\"max_degree\"\t\"min_clustering\"\t\"avgclustering\"\t\"max_clustering\"\t\"avgshortestpath\"\t\"diameter\"\t\"global_efficiency\"\t\"local_efficiency\"\n", fc)
+}
+
+# Calculate the file index number range...
+if (index_from < 1) {
+    index_from = 1
+}
+if (index_to <= 1) {
+    if (nfiles > 1) {
+        index_to = index_from + nfiles - 1
+    }
+}
+nfiles = index_to - index_from + 1
+if (index_in <= 1) {
+    index_in = nfiles
+}
+
+println("Processing " + nfiles + " files...\n")
+
+# Start the simulation...
+for (nf = index_from; nf <= index_to; nf = nf + 1) {
+    if (nfiles > 1) {
+        input_file = prefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", nf) + ".net"
+        report_file = prefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", nf) + ".rep"
+    }
+    
+    println("Processing file " + input_file + "...")
+    
+    # Get the current time...
+    tn1 = time();
+    
+    # Check if the input file name was suplied...
+    if (input_file == "noname") {
+        println("Error: input file name is mandatory.")
+        exit(1)
+    }
+
+    # Load the network file...
+    adj = cnaLoadFile(input_file)
+
+    dim_adj = dim(adj)
+    dim_i = dim_adj[0]
+    dim_j = dim_adj[1]
+
+    # Get the vertex labels...
+    labels = cnaLabels(adj)
+
+    # Remove the vertex labels from the matrix...
+    for (i = 0; i < dim_i; i = i + 1) {
+        adj[0, i] = 0
+        adj[i, 0] = 0
+    }
+
+    # Calculate the network statistics...
+    nvertices = dim_i - 1
+    if (directed) {
+        nedges = count(adj)
+    } else {
+        nedges = count(adj) / 2
+    }
+    
+    # Create the report file...
+    fr = fopen(report_file, "w")
+    
+    # Lod the network statistics...
+    if (calc_stat || calc_all || calc_summary) {
+        if (print_title || calc_all || calc_summary) {
+            fputs("Network statistics:\n", fr)
+        }
+        fputs("Number of vertices = " + nvertices + "\n", fr)
+        if (directed) {
+            fputs("Number of arcs = " + nedges + "\n", fr)
+        } else {
+            fputs("Number of edges = " + nedges + "\n", fr)
+        }
+    }
+
+    # Calculate the network parameters...
+    if (calc_density || calc_all || calc_summary) {
+        density = cnaDensity(adj, directed)
+
+        fputs("Network density = " + density + "\n", fr)
+    }
+
+    # Calculate degrees...
+    if (calc_degrees || calc_all) {
+        degrees = cnaDegrees(adj, directed)
+
+        if (print_title || calc_all) {
+            fputs("\nVertex degrees:\n", fr)
+        }
+        if (print_colnames || calc_all) {
+            line = sprintf("%-20s%15s%15s%15s\n", "Vertex", "Out-degree", "In-degree", "Degree")
+            fputs(line, fr)
+        }
+        foreach (labels; i; label) {
+            line = sprintf("%-20s%15d%15d%15d\n", label, degrees[i, 0], degrees[i, 1], degrees[i, 2])
+            fputs(line, fr)
+        }
+    }
+
+    # Calculate degree distribution...
+    if (calc_degdist || calc_all || calc_summary) {
+        if (!exists("degrees")) {
+            degrees = cnaDegrees(adj, directed)
+        }
+
+        degdist = cnaDegreeDistribution(degrees)
+        dim_degdist = dim(degdist)
+
+        if (print_title || calc_all || calc_summary) {
+            fputs("\nDegree distribution:\n", fr)
+        }
+        if (print_colnames || calc_all || calc_summary) {
+            line = sprintf("%15s%15s%15s\n", "Cluster", "Frequency", "Frequency(%)")
+            fputs(line, fr)
+        }
+        for (i = 0; i < dim_degdist[0]; i = i + 1) {
+            line = sprintf("%15d%15d%15f\n", degdist[i, 0], degdist[i, 1], degdist[i, 2])
+            fputs(line, fr)
+        }
+    }
+
+    # Calculate average degree distribution...
+    if (calc_avgdeg || calc_all || calc_summary) {
+        if (!exists("degrees")) {
+            degrees = cnaDegrees(adj, directed)
+        }
+        
+        avgdeg = cnaAverageDegree(degrees)
+        
+        fputs("\nAverage vertex degree = " + avgdeg + "\n", fr)
+    }
+
+    # Get min and max degrees...
+    if (exists("degrees")) {
+        min_degree = min(degrees, 1, 2, dim_i - 1, 2)
+        max_degree = max(degrees, 1, 2, dim_i - 1, 2)
+    }
+
+    # Free memory...
+    if (exists("degrees")) {
+        degrees = NULL
+    }
+    if (exists("degdist")) {
+        degdist = NULL
+    }
+
+    # Calculate clustering coefficients...
+    if (calc_clustering || calc_all) {
+        clustering = cnaClustering(adj, directed)
+
+        if (print_title || calc_all) {
+            fputs("\nVertex clustering coefficient:\n", fr)
+        }
+        if (print_colnames || calc_all) {
+            line = sprintf("%-20s%15s\n", "Vertex", "Clustering")
+            fputs(line, fr)
+        }
+        foreach (labels; i; label) {
+            line = sprintf("%-20s%15f\n", label, clustering[i, 0])
+            fputs(line, fr)
+        }
+    }
+
+    # Calculate average clustering coefficient...
+    if (calc_avgclustering || calc_all || calc_summary) {
+        if (!exists("clustering")) {
+            clustering = cnaClustering(adj, directed)
+        }
+        
+        avgclustering = cnaAverageClustering(clustering)
+        
+        fputs("\nAverage clustering coefficient = " + avgclustering + "\n", fr)
+    }
+
+    # Get min and max degrees...
+    if (exists("clustering")) {
+        min_clustering = min(clustering, 1, 0, dim_i - 1, 0)
+        max_clustering = max(clustering, 1, 0, dim_i - 1, 0)
+    }
+
+    # Free memory...
+    if (exists("clustering")) {
+        clustering = NULL
+    }
+    
+    # Calculate shortest paths...
+    if (calc_geodesics || calc_all) {
+        if (use_floydwarshall) {
+            geodesic = cnaFloydWarshallShortestPath(adj)
+        } else {
+            geodesic = cnaShortestPath(adj)
+        }
+        dim_geodesic = dim(geodesic)
+        
+        if (print_title || calc_all) {
+            fputs("\nVertex shortest path:\n", fr)
+        }
+        if (print_colnames || calc_all) {
+            data = sprintf("%-20s", "Vertex")
+            fputs(data, fr)
+        } else {
+            data = sprintf("%-20s", " ")
+            fputs(data, fr)
+        }
+        foreach (labels; i; label) {
+            data = sprintf("%15s", label)
+            fputs(data, fr)
+        }
+        fputs("\n", fr)
+        for (i = 1; i < dim_geodesic[0]; i = i + 1) {
+            data = sprintf("%-20s", labels[i])
+            fputs(data, fr)
+            for (j = 1; j < dim_geodesic[1]; j = j + 1) {
+                data = sprintf("%15f", geodesic[i, j])
+                fputs(data, fr)
+                if (j >= dim_geodesic[1]) {
+                    fputs("\n", fr)
+                }
+            }
+            fputs("\n", fr)
+         }
+    }
+
+    # Calculate the average shortest path...
+    if (calc_avgshortestpath || calc_all || calc_summary) {
+        if (!exists("geodesic")) {
+            if (use_floydwarshall) {
+                geodesic = cnaFloydWarshallShortestPath(adj)
+            } else {
+                geodesic = cnaShortestPath(adj)
+            }
+        }
+        
+        avgshortestpath = cnaAverageShortestPath(geodesic)
+        
+        fputs("\nAverage shortest path = " + avgshortestpath + "\n", fr)
+    }
+
+    # Calculate network diameter...
+    if (calc_diameter || calc_all || calc_summary) {
+        if (!exists("geodesic")) {
+            if (use_floydwarshall) {
+                geodesic = cnaFloydWarshallShortestPath(adj)
+            } else {
+                geodesic = cnaShortestPath(adj)
+            }
+        }
+        
+        diameter = cnaDiameter(geodesic)
+
+        fputs("\nNetwork diameter = " + diameter + "\n", fr)
+    }
+
+    # Calculate centralities...
+    if (calc_centrality || calc_all) {
+        if (!exists("geodesic")) {
+            if (use_floydwarshall) {
+                geodesic = cnaFloydWarshallShortestPath(adj)
+            } else {
+                geodesic = cnaShortestPath(adj)
+            }
+        }
+        
+        centrality = cnaCentrality(adj, geodesic, directed)
+        
+        if (print_title || calc_all) {
+            fputs("\nCentrality:\n", fr)
+        }
+        if (print_colnames || calc_all) {
+            line = sprintf("%-20s%15s%15s%15s%15s%15s\n", "Vertex", "Geodesics", "Closeness", "Betweenness", "nCloseness", "nBetweenness")
+            fputs(line, fr)
+        }
+        foreach (labels; i; label) {
+            line = sprintf("%-20s%15f%15f%15f%15f%15f\n", label, centrality[i, 4], centrality[i, 0], centrality[i, 1], centrality[i, 2], centrality[i, 3])
+            fputs(line, fr)
+        }
+    }
+
+    # Free memory...
+    if (exists("centrality")) {
+        centrality = NULL
+    }
+
+    # Calculate vertex efficiency...
+    if (calc_vertex_efficiency || calc_all) {
+        if (!exists("geodesic")) {
+            if (use_floydwarshall) {
+                geodesic = cnaFloydWarshallShortestPath(adj)
+            } else {
+                geodesic = cnaShortestPath(adj)
+            }
+        }
+        
+        vertex_efficiency = cnaVertexEfficiency(geodesic)
+        dim_vertex_efficiency = dim(vertex_efficiency)
+
+        if (print_title || calc_all) {
+            fputs("\nVertex efficiency:\n", fr)
+        }
+        if (print_colnames || calc_all) {
+            data = sprintf("%-20s", "Vertex")
+            fputs(data, fr)
+        } else {
+            data = sprintf("%-20s", " ")
+            fputs(data, fr)
+        }
+        foreach (labels; i; label) {
+            data = sprintf("%15s", label)
+            fputs(data, fr)
+        }
+        fputs("\n", fr)
+        for (i = 1; i < dim_vertex_efficiency[0]; i = i + 1) {
+            data = sprintf("%-20s", labels[i])
+            fputs(data, fr)
+            for (j = 1; j < dim_vertex_efficiency[1]; j = j + 1) {
+                data = sprintf("%15f", vertex_efficiency[i, j])
+                fputs(data, fr)
+                if (j >= dim_vertex_efficiency[1]) {
+                    fputs("\n", fr)
+                }
+            }
+            fputs("\n", fr)
+         }
+    }
+
+    # Calculate the global efficiency...
+    if (calc_global_efficiency || calc_all || calc_summary) {
+        if (!exists("geodesic")) {
+            if (use_floydwarshall) {
+                geodesic = cnaFloydWarshallShortestPath(adj)
+            } else {
+                geodesic = cnaShortestPath(adj)
+            }
+        }
+        if (!exists("vertex_efficiency")) {
+            vertex_efficiency = cnaVertexEfficiency(geodesic)
+        }
+        
+        global_efficiency = cnaGlobalEfficiency(vertex_efficiency)
+
+        fputs("\nAverage global efficiency = " + global_efficiency + "\n", fr)
+    }
+
+    # Calculate the subgraph efficiency...
+    if (calc_subgraph_efficiency || calc_all) {
+        if (!exists("geodesic")) {
+            if (use_floydwarshall) {
+                geodesic = cnaFloydWarshallShortestPath(adj)
+            } else {
+                geodesic = cnaShortestPath(adj)
+            }
+        }
+        if (!exists("vertex_efficiency")) {
+            vertex_efficiency = cnaVertexEfficiency(geodesic)
+        }
+        
+        subgraph_efficiency = cnaSubgraphEfficiency(adj, vertex_efficiency)
+        
+        if (print_title || calc_all) {
+            fputs("\nLocal vertex efficiency:\n", fr)
+        }
+        if (print_colnames || calc_all) {
+            line = sprintf("%-20s%15s\n", "Vertex", "Loc. Effic.")
+            fputs(line, fr)
+        }
+        foreach (labels; i; label) {
+            line = sprintf("%-20s%15f\n", label, subgraph_efficiency[i, 0])
+            fputs(line, fr)
+        }
+    }
+    
+    # Calculate the Latora and Marchiori subgraph efficiency...
+    if (calc_latora_subgraph_efficiency || calc_all) {
+        if (use_floydwarshall) {
+            latora_subgraph_efficiency = cnaLatoraSubgraphEfficiencyFW(adj)
+        } else {
+            latora_subgraph_efficiency = cnaLatoraSubgraphEfficiency(adj)
+        }
+        
+        if (print_title || calc_all) {
+            fputs("\nLatora and Marchiori local vertex efficiency:\n", fr)
+        }
+        if (print_colnames || calc_all) {
+            line = sprintf("%-20s%15s\n", "Vertex", "Loc. Effic.")
+            fputs(line, fr)
+        }
+        foreach (labels; i; label) {
+            line = sprintf("%-20s%15f\n", label, latora_subgraph_efficiency[i, 0])
+            fputs(line, fr)
+        }
+    }
+    
+    # Calculate the plasticity subgraph efficiency...
+    if (calc_plasticity_subgraph_efficiency || calc_all) {
+        if (use_floydwarshall) {
+            plasticity_subgraph_efficiency = cnaPlasticitySubgraphEfficiencyFW(adj)
+        } else {
+            plasticity_subgraph_efficiency = cnaPlasticitySubgraphEfficiency(adj)
+        }
+        
+        if (print_title || calc_all) {
+            fputs("\nPlasticity local vertex efficiency:\n", fr)
+        }
+        if (print_colnames || calc_all) {
+            line = sprintf("%-20s%15s\n", "Vertex", "Res. Effic.")
+            fputs(line, fr)
+        }
+        foreach (labels; i; label) {
+            line = sprintf("%-20s%15f\n", label, plasticity_subgraph_efficiency[i, 0])
+            fputs(line, fr)
+        }
+    }
+    
+    # Calculate the local efficiency...
+    if (calc_local_efficiency || calc_all || calc_summary) {
+        if (!exists("geodesic")) {
+            if (use_floydwarshall) {
+                geodesic = cnaFloydWarshallShortestPath(adj)
+            } else {
+                geodesic = cnaShortestPath(adj)
+            }
+        }
+        if (!exists("vertex_efficiency")) {
+            vertex_efficiency = cnaVertexEfficiency(geodesic)
+        }
+        if (!exists("subgraph_efficiency")) {
+            subgraph_efficiency = cnaSubgraphEfficiency(adj, vertex_efficiency)
+        }
+        
+        local_efficiency = cnaLocalEfficiency(subgraph_efficiency)
+        
+        fputs("\nAverage local efficiency = " + local_efficiency + "\n", fr)
+    }
+    
+    # Calculate the Latora and Marchiori local efficiency...
+    if (calc_latora_local_efficiency) {
+        if (!exists("latora_subgraph_efficiency")) {
+            if (use_floydwarshall) {
+                latora_subgraph_efficiency = cnaLatoraSubgraphEfficiencyFW(adj)
+            } else {
+                latora_subgraph_efficiency = cnaLatoraSubgraphEfficiency(adj)
+            }
+        }
+        
+        latora_local_efficiency = cnaLocalEfficiency(latora_subgraph_efficiency)
+        
+        fputs("\nAverage Latora local efficiency = " + latora_local_efficiency + "\n", fr)
+    }
+    
+    # Calculate the plasticity local efficiency...
+    if (calc_plasticity_local_efficiency) {
+        if (!exists("plasticity_subgraph_efficiency")) {
+            if (use_floydwarshall) {
+                plasticity_subgraph_efficiency = cnaPlasticitySubgraphEfficiencyFW(adj)
+            } else {
+                plasticity_subgraph_efficiency = cnaPlasticitySubgraphEfficiency(adj)
+            }
+        }
+        
+        plasticity_local_efficiency = cnaLocalEfficiency(plasticity_subgraph_efficiency)
+        
+        fputs("\nPlasticity local efficiency = " + plasticity_local_efficiency + "\n", fr)
+    }
+    
+    # Free memory...
+    if (exists("geodesic")) {
+        geodesic = NULL
+    }
+    if (exists("vertex_efficiency")) {
+        vertex_efficiency = NULL
+    }
+    if (exists("subgraph_efficiency")) {
+        subgraph_efficiency = NULL
+    }
+    if (exists("latora_subgraph_efficiency")) {
+        latora_subgraph_efficiency = NULL
+    }
+    
+    # Show the adjacency matrix...
+    if (print_adj || calc_all) {
+        if (print_title || calc_all) {
+            fputs("\nAdjacency matrix:\n", fr)
+        }
+        if (print_colnames || calc_all) {
+            data = sprintf("%-20s", "Vertex")
+            fputs(data, fr)
+        } else {
+            data = sprintf("%-20s", " ")
+            fputs(data, fr)
+        }
+        foreach (labels; i; label) {
+            data = sprintf("%15s", label)
+            fputs(data, fr)
+        }
+        fputs("\n", fr)
+        for (i = 1; i < dim_i; i = i + 1) {
+            data = sprintf("%-20s", labels[i])
+            fputs(data, fr)
+            for (j = 1; j < dim_j; j = j + 1) {
+                data = sprintf("%15f", adj[i, j])
+                fputs(data, fr)
+                if (j >= dim_adj[1]) {
+                    fputs("\n", fr)
+                }
+            }
+            fputs("\n", fr)
+         }
+    }
+
+    # Show the subgraph matrix...
+    if (print_subgraph || calc_all) {
+        subgraph = cnaGetSubgraphs(adj)
+        
+        if (print_title || calc_all) {
+            fputs("\nSubgraph vertices:\n", fr)
+        }
+        if (print_colnames || calc_all) {
+            line = sprintf("%-20s%s\n", "Vertex", "Subgraph")
+            fputs(line, fr)
+        }
+        foreach (labels; i; label) {
+            line = sprintf("%-20s%s\n", label, subgraph[i, 0])
+            fputs(line, fr)
+        }
+    }
+
+    # Free memory...
+    if (exists("subgraph")) {
+        subgraph = NULL
+    }
+
+    # Close the report file...
+    fclose(fr)
+
+    # Save the modified network file.
+    if (output_file != "noname") {
+        foreach (labels; i; label) {
+            adj[0, i] = label
+            adj[i, 0] = label
+        }
+
+        cnaSaveFile(output_file, adj, output_file_type)
+    }
+
+    # Store the network properties...
+    if (csv_file != "noname") {
+        fputs(sprintf("%d\t%d\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%f\t%d\t%f\t%f\n", nvertices, roundl(nedges), density, min_degree, avgdeg, max_degree, min_clustering, avgclustering, max_clustering, avgshortestpath, roundl(diameter), global_efficiency, local_efficiency), fc)
+    }
+    
+    # Get the current time...
+    tn2 = time();
+
+    # Show the elapsed time...
+    printf("Elapsed time to calculate this network properties: %.3f seconds\n\n", tn2 - tn1)
+
+    # Log the elapsed time...
+    if (log_file != "noname") {
+        fputs(sprintf("%d\t%.3f\n", nf, tn2 - tn1), fl)
+    }
+    
+    labels = NULL
+}
+
+# Close the log file...
+if (log_file != "noname") {
+    fclose(fl)
+}
+
+# Close the CSV file...
+if (csv_file != "noname") {
+    fclose(fc)
+}
+
+# Get the current time...
+t2 = time();
+
+# Show the elapsed time...
+printf("Elapsed time to process %d files: %.3f seconds\n\n", nfiles, t2 - t1)

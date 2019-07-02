@@ -1,0 +1,209 @@
+#!/usr/local/bin/guash
+#
+# pbm2csv.gua
+#
+#     This script gets the time series that spawned a chart in PBM format.
+#
+# Copyright (C) 2014 Roberto Luiz Souza Monteiro,
+#                    Hernane Borges de Barros Pereira.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: pbm2csv.gua,v 1.0 2014/03/22 19:13:00 monteiro Exp $
+#
+
+function CNA_LoadPBM(file_name) {
+    fp = fopen(file_name, "r")
+
+    image_type = "none"
+    image_size = "none"
+    
+    x = 0
+    y = 0
+    
+    while (!feof(fp)) {
+        if((line = fgets(fp)) == NULL) { 
+            break
+        }
+        
+        data = trim(line, " \t\r\n")
+        
+        if (length(data) == 0) {
+            continue
+        }
+        
+        # Parse comments...
+        if (data[0] == "#") {
+            continue
+        }
+        
+        # Get the image type...
+        if (image_type == "none") {
+            image_type = data
+            if (image_type == "P1") {
+                continue
+            } else {
+                return(NULL)
+            }
+        }
+        
+        # Get the image size...
+        if (image_size == "none") {
+            image_size = split(data)
+            dim_x = eval(image_size[0])
+            dim_y = eval(image_size[1])
+            if (length(image_size) == 2) {
+                pixmap = matrix(0, dim_y, dim_x)
+                continue
+            } else {
+                return(NULL)
+            }
+        }
+        
+        # Parse the image data...
+        for (i = 0; i < length(data); i = i + 1) {
+            pixmap[y, x] = eval(data[i])
+            
+            if (x < (dim_x - 1)) {
+                x = x + 1
+            } else {
+                x = 0
+                y = y + 1
+            }
+        }
+        
+        # Go to the next image line...
+        if (x == dim_x) {
+            x = 0
+            y = y + 1
+        }
+    }
+    
+    fp = fclose(fp)
+    
+    return(pixmap)
+}
+
+function CNA_SavePBM(filename, pixmap) {
+    dim_pixmap = dim(pixmap)
+    dim_y = dim_pixmap[0]
+    dim_x = dim_pixmap[1]
+    
+    fp = fopen(filename, "w")
+    
+    # Save the Netpbm format type and the image size...
+    fputs("P1\n" , fp)
+    fputs("# CREATOR: SCNATools Version 1.4.2\n" , fp)
+    fputs("" + dim_x + " " + dim_y + "\n" , fp)
+    
+    # Save the PBM image...
+    for (i = 0; i < dim_y; i = i + 1) {
+        n = 0
+        for (j = 0; j < dim_x; j = j + 1) {
+            fputs("" + pixmap[i, j], fp)
+            n = n + 1
+            if (n == 70) {
+                fputs("\n", fp)
+                n = 0
+            }
+        }
+        fputs("\n", fp)
+    }
+    
+    fp = fclose(fp)
+}
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "output.csv"
+xrange = ""
+yrange = ""
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: pbm2csv option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: pbm2csv option1 value1 [option1 value1]")
+        println("-h    --help      show the options sumary")
+        println("-i                input file")
+        println("-o                output file")
+        println("      --xrange    lower and upper limits of the x-axis")
+        println("      --yrange    lower and upper limits of the y-axis")
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "--xrange") {
+        i = i + 1
+        xrange = eval(argv[i])
+    } elseif (argv[i] == "--yrange") {
+        i = i + 1
+        yrange = eval(argv[i])
+    }
+    i = i + 1
+} 
+
+# Check if the input file name was suplied.
+if (input_file == "noname") {
+    println("Error: input file name is mandatory.")
+    exit(1)
+}
+
+# Load the graph...
+pixmap = CNA_LoadPBM(input_file)
+dim_pixmap = dim(pixmap)
+dim_y = dim_pixmap[0]
+dim_x = dim_pixmap[1]
+
+x1 = xrange[0]
+x2 = xrange[1]
+y1 = yrange[0]
+y2 = yrange[1]
+
+# Get the time series...
+for (j = 0; j < dim_x; j = j + 1) {
+    for (i = 0; i < dim_y; i = i + 1) {
+        if (pixmap[i, j] == 1) {
+            t = (((x2 - x1) * j) / dim_x) + x1
+            v = -(((y2 - y1) * i) / dim_y) - y1
+            tseries["" + t] = v
+        }
+    }
+}
+
+# Save the time series...
+fc = fopen(output_file, "w")
+
+if (exists("tseries")) {
+    foreach (tseries; t; v) {
+        fputs("" + t + ";" + v + "\n", fc)
+    }
+}
+
+fc = fclose(fc)
+

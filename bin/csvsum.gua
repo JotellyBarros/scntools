@@ -1,0 +1,143 @@
+#!/usr/local/bin/guash
+#
+# csvsum.gua
+#
+#     This script sum occurences of values found in a CSV table file.
+#
+# Copyright (C) 2011 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: csvsum.gua,v 1.2 2013/03/17 09:40:00 monteiro Exp $
+#
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "output.txt"
+separator = ","
+column = 0
+firstline = 1
+printfirst = FALSE
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: csvsum option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: csvsum option1 value1 [option1 value1]")
+        println("-h    --help          show the options sumary")
+        println("-i                    input file")
+        println("-o                    output file")
+        println("      --separator     field separator(default=\",\")")
+        println("      --column        column number(default=0)")
+        println("      --firstline     first line to include in calculations")
+        println("      --printfirst    print first line")
+       exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "--separator") {
+        i = i + 1
+        separator = argv[i]
+    } elseif (argv[i] == "--column") {
+        i = i + 1
+        column = eval(argv[i])
+    } elseif (argv[i] == "--firstline") {
+        i = i + 1
+        firstline = eval(argv[i])
+    } elseif (argv[i] == "--printfirst") {
+        printfirst = TRUE
+    }
+    i = i + 1
+} 
+
+# Check if the input file name was suplied.
+if (input_file == "noname") {
+    println("Error: input file name is mandatory.")
+    exit(1)
+}
+
+# Calculate statistics.
+fp = fopen(input_file, "r")
+
+t = 0
+i = 0
+while (!feof(fp)) {
+    if ((line = fgets(fp)) == NULL) { 
+        break
+    }
+
+    record = split(trim(line, "\r\n"), separator)
+    
+    if ((i == 0) && printfirst) {
+        firstrecord = eval(record[column])
+    }
+    
+    if (i >= firstline) {
+        try {
+            data[eval(record[column])] = data[eval(record[column])] + 1
+        } catch {
+            data[eval(record[column])] = 1
+        }
+    }
+    
+    i = i + 1
+}
+
+fp = fclose(fp)
+
+# Save statistics.
+fp = fopen(output_file, "w")
+
+t = 0
+foreach (data; n; v) {
+    t = t + v
+}
+
+i = 0
+foreach (data; n; v) {
+    if ((i == 0) && printfirst) {
+        if (type(n) == GUA_STRING) {
+            fputs("" + trim(firstrecord, " \t\n") + "\n\n", fp)
+        } else {
+            fputs("" + firstrecord + "\n\n", fp)
+        }
+    }
+    
+    if (type(n) == GUA_STRING) {
+        fputs("" + trim(n, " \t\n") + "\t" + v + "\t" + sprintf("%.2f", ((v * 1.0 / t)) * 100) + "%\n", fp)
+    } else {
+        fputs("" + n + "\t" + v + "\t" + sprintf("%.2f", ((v * 1.0 / t)) * 100) + "%\n", fp)
+    }
+    
+    i = i + 1
+}
+
+fputs("\nSum:\t" + t + "\n\n", fp)
+
+fp = fclose(fp)
+

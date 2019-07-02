@@ -1,0 +1,191 @@
+#!/usr/local/bin/guash
+#
+# txtfilter.gua
+#
+#     This script filters a TXT or CSV network file based a given second CSV file.
+#
+# Copyright (C) 2011 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: txtfilter.gua,v 1.1 2012/02/13 12:50:00 monteiro Exp $
+#
+
+#
+# Configuration variables.
+#
+input_file1 = "noname"
+input_file2 = "noname"
+output_file = "output.csv"
+log_file = "noname"
+entry_exists = TRUE
+file1sep = " "
+file2sep = " "
+file1col = 0
+file2col = 0
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: txtfilter option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: filternetcsv option1 value1 [option1 value1]")
+        println("-h    --help         show the options sumary")
+        println("      --i1           first input file")
+        println("      --i2           second input file")
+        println("-o                   output file")
+        println("-l                   log file")
+        println("      --exists       let entries found in file 2(default)")
+        println("      --notexists    let entries not found in file 2")
+        println("      --file1sep     first file field separator(default=\" \")")
+        println("      --file2sep     second file field separator(default=\" \")")
+        println("      --file1col     first file column number(default=0)")
+        println("      --file2col     second file column number(default=0)")
+        exit(0)
+    } elseif (argv[i] == "--i1") {
+        i = i + 1
+        input_file1 = argv[i]
+    } elseif (argv[i] == "--i2") {
+        i = i + 1
+        input_file2 = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "-l") {
+        i = i + 1
+        log_file = argv[i]
+    } elseif (argv[i] == "--exists") {
+        i = i + 1
+        entry_exists = TRUE
+    } elseif (argv[i] == "--notexists") {
+        i = i + 1
+         entry_exists = FALSE
+    } elseif (argv[i] == "--file1sep") {
+        i = i + 1
+        file1sep = argv[i]
+    } elseif (argv[i] == "--file2sep") {
+        i = i + 1
+        file2sep = argv[i]
+    } elseif (argv[i] == "--file1col") {
+        i = i + 1
+        file1col = eval(argv[i])
+    } elseif (argv[i] == "--file2col") {
+        i = i + 1
+        file2col = eval(argv[i])
+    }
+    i = i + 1
+}
+
+# Check if the input file name was suplied.
+if (input_file1 == "noname") {
+    println("Error: input file 1 name is mandatory.")
+    exit(1)
+}
+if (input_file2 == "noname") {
+    println("Error: input file 2 name is mandatory.")
+    exit(1)
+}
+
+# Open the input files.
+f1 = fopen(input_file1, "r")
+f2 = fopen(input_file2, "r")
+
+# Create the output file.
+ft = fopen(output_file, "w")
+
+# Create the log file.
+if (log_file != "noname") {
+    fl = fopen(log_file, "w")
+}
+
+if((line1 = fgets(f1)) == NULL) {
+    f1 = fclose(f1)
+    f2 = fclose(f2)
+    ft = fclose(ft)
+    if (log_file != "noname") {
+        fl = fclose(fl)
+    }
+    
+    println("Error: can not read file " + input_file1)
+    exit(1)
+}
+
+while (!feof(f1)) {
+    if ((line1 = fgets(f1)) == NULL) {
+        break
+    }
+    
+    if (file1sep != " ") {
+        record1 = split(trim(line1, " \t\n"), file1sep)
+    } else {
+        record1 = split(trim(line1, " \t\n"))
+    }
+    
+    f1column = record1[file1col]
+    
+    found = FALSE
+    
+    while (!feof(f2)) {
+        if ((line2 = fgets(f2)) == NULL) {
+            break
+        }
+
+        if (file2sep != " ") {
+            record2 = split(trim(line2, " \t\n"), file2sep)
+        } else {
+            record2 = split(trim(line2, " \t\n"))
+        }
+        
+        f2column = record2[file2col]
+        
+        if (f1column == f2column) {
+            found = TRUE
+            break
+        }
+    }
+    
+    # Rewind the second file to the next search...
+    rewind(f2)
+    
+    # Write data...
+    if (entry_exists) {
+        if (found) {
+            fputs(line1, ft)
+        } else {
+            fputs(line1, fl)
+        }
+    } else {
+        if (!found) {
+            fputs(line1, ft)
+        } else {
+            fputs(line1, fl)
+        }
+    }
+}
+
+f1 = fclose(f1)
+f2 = fclose(f2)
+ft = fclose(ft)
+if (log_file != "noname") {
+    fl = fclose(fl)
+}
+

@@ -1,0 +1,282 @@
+#!/usr/local/bin/guash
+#
+# csv2net.gua
+#
+#     This script creates a Pajek network file from a CSV network file.
+#
+# Copyright (C) 2011 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: csv2net.gua,v 1.1 2012/02/13 12:50:00 monteiro Exp $
+#
+
+function CNA_SaveFile(filename, adj, type = "edges", nvertices = 0) {
+    dim_adj = dim(adj)
+    dim_i = dim_adj[0]
+    dim_j = dim_adj[1]
+
+    # Each line in a Pajek files must terminate with CR+LF.
+    # Windows will automaticly converts "\n" to "\r\n", but
+    # Linux will not.
+    if ($SYS_HOST == "linux") {
+        new_line = "\r\n"
+    } else {
+        new_line = "\n"
+    }
+
+    fp = fopen(filename, "w")
+
+    # Save vertices...
+    if (nvertices == 0) {
+        fputs("*Vertices " + (dim_i - 1) + new_line, fp)
+    # Two modes networks... 
+    } else {
+        fputs("*Vertices " + (dim_i - 1) + " " + nvertices + new_line, fp)
+    }
+    for (i = 1; i < dim_i; i = i + 1) {
+        fputs(i + " \"" + adj[i, 0] + "\"" + new_line, fp)
+    }
+
+    # Save edges...
+    if (type == "edges") {
+        fputs("*Edges" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                if (adj[i, j] != 0) {
+                    fputs(i + " " + j + " " + adj[i, j] + new_line, fp)
+                }
+            }
+        }
+    # Save arcs...
+    } elseif (type == "arcs") {
+        fputs("*Arcs" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                if (adj[i, j] != 0) {
+                    fputs(i + " " + j + " " + adj[i, j] + new_line, fp)
+                }
+            }
+        }
+    # Save matrix...
+    } elseif (type == "matrix") {
+        fputs("*Matrix" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                fputs(" " + adj[i, j], fp)
+            }
+            fputs(new_line, fp)
+        }
+    }
+
+    fp = fclose(fp)
+}
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "output.net"
+modes = 1
+separator = ","
+ignore = "NULL"
+addsufix = FALSE
+
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: csv2net option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: csv2net option1 value1 [option1 value1]")
+        println("-h    --help         show the options sumary")
+        println("-i                   input file")
+        println("-o                   output file")
+        println("      --modes        selects one or two modes network(default=1)")
+        println("      --separator    column separator(default=\",\")")
+        println("      --ignore       ignore fields with the specified patern(default=NULL)")
+        println("      --addsufix     add a mode sufix to each vertex")
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "--modes") {
+        i = i + 1
+        modes = eval(argv[i])
+    } elseif (argv[i] == "--separator") {
+        i = i + 1
+        separator = argv[i]
+    } elseif (argv[i] == "--ignore") {
+        i = i + 1
+        ignore = argv[i]
+    } elseif (argv[i] == "--addsufix") {
+        addsufix = TRUE
+    }
+    i = i + 1
+} 
+
+# Check if the input file name was suplied.
+if (input_file == "noname") {
+    println("Error: input file name is mandatory.")
+    exit(1)
+}
+
+# Pass 1: get vertices...
+fp = fopen(input_file, "r")
+
+n1 = 0
+n2 = 0
+
+if (modes == 2) {
+    while (!feof(fp)) {
+        if ((line = fgets(fp)) == NULL) { 
+            break
+        }
+
+        record = split(trim(line, " \t\n"), separator)
+
+        if (addsufix) {
+            column1 = eval(record[0]) + "_M1"
+            column2 = eval(record[1]) + "_M2"
+        } else {
+            column1 = "" + eval(record[0])
+            column2 = "" + eval(record[1])
+        }
+        
+        try {
+            if (search(keys(mode1), column1) == NULL) {
+                n1 = n1 + 1
+                mode1[column1] = n1
+            }
+        } catch {
+            n1 = n1 + 1
+            mode1[column1] = n1
+        }
+        
+        if (column2 != ignore) {
+            try {
+                if (search(keys(mode2), column2) == NULL) {
+                    n2 = n2 + 1
+                    mode2[column2] = n2
+                }
+            } catch {
+                n2 = n2 + 1
+                mode2[column2] = n2
+            }
+        }
+    }
+    n = 0
+    foreach (mode1; name; value) {
+        n = n + 1
+        vertex[name] = n
+    }
+    nvertices_mode1 = n
+    foreach (mode2; name; value) {
+        n = n + 1
+        vertex[name] = n
+    }
+    n = 0
+    foreach (vertex; name; value) {
+        n = n + 1
+        vertex[name] = n
+    }
+} else {
+    while (!feof(fp)) {
+        if ((line = fgets(fp)) == NULL) { 
+            break
+        }
+
+        record = split(trim(line, " \t\n"), separator)
+        
+        column1 = eval(record[0])
+        column2 = eval(record[1])
+
+        try {
+            if (search(keys(vertex), column1) == NULL) {
+                n1 = n1 + 1
+                vertex[column1] = n1
+            }
+        } catch {
+            n1 = n1 + 1
+            vertex[column1] = n1
+        }
+        
+        if (column2 != ignore) {
+            try {
+                if (search(keys(vertex), column2) == NULL) {
+                    n1 = n1 + 1
+                    vertex[column2] = n1
+                }
+            } catch {
+                n1 = n1 + 1
+                vertex[column2] = n1
+            }
+        }
+    }
+}
+
+fp = fclose(fp)
+
+nvertices = length(vertex)
+adj = matrix(0, nvertices + 1, nvertices + 1)
+
+foreach (vertex; n; v) {
+    adj[0, v] = n
+    adj[v, 0] = n    
+}
+
+# Pass 2: generate the network...
+fp = fopen(input_file, "r")
+
+while (!feof(fp)) {
+    if ((line = fgets(fp)) == NULL) { 
+        break
+    }
+
+    record = split(trim(line, " \t\n"), separator)
+
+    if (addsufix) {
+        column1 = eval(record[0]) + "_M1"
+        column2 = eval(record[1]) + "_M2"
+    } else {
+        column1 = trim("" + eval(record[0]))
+        column2 = trim("" + eval(record[1]))
+    }
+
+    if (column2 != ignore) {
+        adj[vertex[column1], vertex[column2]] = 1
+    }
+}
+
+fp = fclose(fp)
+
+if (modes == 1) {
+    CNA_SaveFile(output_file, adj, "edges")
+} else {
+    CNA_SaveFile(output_file, adj, "edges", nvertices_mode1)
+}
+
+exit(0)
+

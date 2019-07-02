@@ -1,0 +1,256 @@
+#!/usr/local/bin/guash
+#
+# rmsentences.gua
+#
+#     This script removes sentences from a semantic file.
+#
+# Copyright (C) 2011 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: rmsentences.gua,v 1.7 2012/01/04 15:52:00 monteiro Exp $
+#
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "output.txt"
+log_file = "output.log"
+count_only = FALSE
+prefix = "sample"
+nfiles = 1
+tseed = FALSE
+rmnum = 0
+rmtax = 0
+letn = 0
+
+if ($SYS_HOST == "linux") {
+    new_line = "\r\n"
+} else {
+    new_line = "\n"
+}
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: rmsentences option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: rmsentences option1 value1 [option1 value1]")
+        println("-h    --help          show the options sumary")
+        println("-i                    input file")
+        println("-o                    output file")
+        println("-l                    log file")
+        println("      --count         only count the number of sentences in file")
+        println("      --prefix        file name prefix for multiple file creation")
+        println("      --nfiles        number of files for multiple file creation")
+        println("      --tseed         use the time as seed to random number generation")
+        println("      --rmnum         remove the specified number of sentences")
+        println("      --rmtax         remove tax(default=10)")
+        println("      --letn          let only the specified number of sentences in the file")
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "-l") {
+        i = i + 1
+        log_file = argv[i]
+    } elseif (argv[i] == "--count") {
+        count_only = TRUE
+    } elseif (argv[i] == "--prefix") {
+        i = i + 1
+        prefix = argv[i]
+    } elseif (argv[i] == "--nfiles") {
+        i = i + 1
+        nfiles = eval(argv[i])
+    } elseif (argv[i] == "--tseed") {
+        tseed = TRUE
+    } elseif (argv[i] == "--rmnum") {
+        i = i + 1
+        rmnum = eval(argv[i])
+    } elseif (argv[i] == "--rmtax") {
+        i = i + 1
+        rmtax = eval(argv[i])
+    } elseif (argv[i] == "--letn") {
+        i = i + 1
+        letn = eval(argv[i])
+    }
+    i = i + 1
+}
+
+# Check if the input file name was suplied.
+if (input_file == "noname") {
+    println("Error: input file name is mandatory.")
+    exit(1)
+}
+
+# Get every sentence from the source file and count it...
+fs = fopen(input_file, "r")
+
+n = 0
+
+# Store and count sentences...
+println("Counting sentences...")
+
+while (!feof(fs)) {
+    if ((line = fgets(fs)) == NULL) { 
+        break
+    }
+
+    record = split(trim(line, " \t\r\n"), " \t")
+    word = record[0]
+
+    if (word == "{S}") {
+        if (exists("sentence")) {
+            s = ""
+            foreach (sentence; w; c) {
+                s = s + w + "\t" + c + ";"
+            }
+            sentences[n] = trim(s, ";")
+            sentence = NULL
+            
+            n = n + 1
+        }
+    } else {
+        wclass = record[1]
+        sentence[word] = wclass
+    }
+}
+
+if ((length(word) > 0) && (word != "{S}")) {
+    if (exists("sentence")) {
+        s = ""
+        foreach (sentence; w; c) {
+            s = s + w + "\t" + c + ";"
+        }
+        sentences[n] = trim(s, ";")
+        sentence = NULL
+        
+        n = n + 1
+    }
+}
+
+fs = fclose(fs)
+
+println("Found " + n + " sentences.")
+
+if (count_only) {
+    exit(0)
+}
+
+# Calculating the left sentences number...
+println("Calculating the left sentences number...")
+
+if ((rmnum > 0) && (letn == 0) && (rmtax == 0)) {
+    letcount = n - rmnum
+}
+if ((rmnum == 0) && (letn == 0) && (rmtax > 0)) {
+    letcount = n - roundl(n * (rmtax / 100.0))
+}
+if ((rmnum == 0) && (letn > 0) && (rmtax == 0)) {
+    letcount = letn
+}
+
+if (letcount > n) {
+    println("Error: number of sentences to left in file exceeds the total number of sentences.")
+    exit(1)
+}
+
+t1 = time();
+
+for (i = 1; i <= nfiles; i = i + 1) {
+    println("Generating sample " + i + "...")
+    
+    # Get the current time...
+    ts1 = time();
+    
+    if (nfiles > 1) {
+        output_file = prefix + "-" + sprintf("%0" + length(toString(nfiles)) + "." + length(toString(nfiles)) + "d", i) + ".txt"
+        log_file = prefix + "-" + sprintf("%0" + length(toString(nfiles)) + "." + length(toString(nfiles)) + "d", i) + ".log"
+    }
+
+    # Remove sentences...    
+    mstay = matrix(0, n)
+    
+    if (tseed) {
+        srandom(time)
+    } else {
+        srandom(i)
+    }
+    
+    lc = letcount
+    
+    println("Selecting " + lc + " sentences...")
+    
+    while (lc > 0) {
+        si = roundl(random() * (n - 1))
+        if (!mstay[si]) {
+            mstay[si] = 1
+            lc = lc - 1
+        }
+    }
+    
+    ft = fopen(output_file, "w")
+    fl = fopen(log_file, "w")
+    
+    println("Saving files...")
+    println("Saving " + count(mstay) + " sentences...")
+    
+    foreach (sentences; k; v) {
+        if (mstay[k]) {
+            s = split(v, ";")
+            foreach (s; nw; w) {
+                fputs(w + new_line, ft);
+            }
+            fputs("{S}" + new_line, ft);
+        } else{
+            s = split(v, ";")
+            foreach (s; nw; w) {
+                fputs(w + new_line, fl);
+            }
+            fputs("{S}" + new_line, fl);
+        }
+    }
+    
+    ft = fclose(ft)
+    fl = fclose(fl)
+    
+    mstay = NULL
+    
+    # Get the current time...
+    ts2 = time();
+    
+    # Show the elapsed time...
+    printf("Elapsed time to generate this sample: %.3f seconds\n\n", ts2 - ts1)
+}
+
+# Get the current time...
+t2 = time();
+
+# Show the elapsed time...
+printf("Elapsed time to generate %d samples: %.3f seconds\n\n", nfiles, t2 - t1)
+
+exit(0)
+

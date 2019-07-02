@@ -1,0 +1,132 @@
+#!/usr/local/bin/guash
+#
+# kdb2csv.gua
+#
+#     This script creates a Pajek network file from a keyed database file.
+#
+# Copyright (C) 2012 Roberto Luiz Souza Monteiro, Hernane Borges de Barros Pereira.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: kdb2csv.gua,v 1.0 2012/10/07 22:34:00 monteiro Exp $
+#
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "output.csv"
+
+data["Title"] = ""
+data["Authors"] = ""
+data["Institution"] = ""
+last = ""
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: kdb2csv option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: kdb2csv option1 value1 [option1 value1]")
+        println("-h    --help          show the options sumary")
+        println("-i                    input file")
+        println("-o                    output file")
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    }
+    i = i + 1
+}
+
+# Check if the input file name was suplied.
+if (input_file == "noname") {
+    println("Error: input file name is mandatory.")
+    exit(1)
+}
+
+# Open the input file...
+fi = fopen(input_file, "r")
+
+# Open the output file...
+fo = fopen(output_file, "w")
+
+# Write the CSV header...
+fputs(trim(toString(keys(data)), "{}") + "\n", fo)
+
+while (!feof(fi)) {
+    if ((line = fgets(fi)) == NULL) { 
+        break
+    }
+    
+    if (length(trim(line, " \t\r\n")) == 0) {
+        if (!((data["Title"] == "") || (data["Authors"] == "") || (data["Institution"] == ""))) {
+            fputs(trim(toString(data), "{}") + "\n", fo)
+        }
+        data["Title"] = ""
+        data["Authors"] = ""
+        data["Institution"] = ""
+        last = ""
+        
+        continue
+    }
+    
+    record = split(trim(line, " \t\r\n"), ":")
+    
+    if (length(record) >= 2) {
+        if (record[0] == "Title") {
+            if (length(record) == 2) {
+                data["Title"] = record[1]
+            } else {
+                data["Title"] = record[1]
+                for (i = 2; i < length(record); i = i + 1) {
+                    data["Title"] = data["Title"] + ":" + record[i]
+                }
+            }
+            last = "Title"
+        } elseif (record[0] == "Authors") {
+            data["Authors"] = record[1]
+            last = "Authors"
+        } elseif (record[0] == "Institution") {
+            data["Institution"] = record[1]
+            last = "Institution"
+        }
+    } else {
+        if (strpos(record[0], ".txt") == -1) {
+            if (last == "Title") {
+                data["Title"] = data["Title"] + " " + record[0]
+            } elseif (last == "Authors") {
+                data["Authors"] = data["Authors"] + " " + record[0]
+            } elseif (last == "Institution") {
+                data["Institution"] = data["Institution"] + " " + record[0]
+            }
+        }
+    }
+}
+
+# Close all files...
+fi = fclose(fi)
+fo = fclose(fo)
+

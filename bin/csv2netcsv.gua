@@ -1,0 +1,128 @@
+#!/usr/local/bin/guash
+#
+# csv2netcsv.gua
+#
+#     This script creates a CSV network file from a CSV table file.
+#
+# Copyright (C) 2011 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: csv2netcsv.gua,v 1.1 2012/02/13 12:50:00 monteiro Exp $
+#
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "output.csv"
+s1 = ","
+s2 = ";"
+s3 = ","
+c1 = 0
+c2 = 1
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: csv2netcsv option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: csv2netcsv option1 value1 [option1 value1]")
+        println("-h    --help    show the options sumary")
+        println("-i              input file")
+        println("-o              output file")
+        println("      --s1      record field separator(default=\",\")")
+        println("      --s2      internal column field separator(default=\";\")")
+        println("      --s3      new record field separator(default=\",\")")
+        println("      --c1      first column number(default=0)")
+        println("      --c2      second column number(default=1)")
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "--s1") {
+        i = i + 1
+        s1 = argv[i]
+    } elseif (argv[i] == "--s2") {
+        i = i + 1
+        s2 = argv[i]
+    } elseif (argv[i] == "--s3") {
+        i = i + 1
+        s3 = argv[i]
+    } elseif (argv[i] == "--c1") {
+        i = i + 1
+        c1 = eval(argv[i])
+    } elseif (argv[i] == "--c2") {
+        i = i + 1
+        c2 = eval(argv[i])
+    }
+    i = i + 1
+} 
+
+# Check if the input file name was suplied.
+if (input_file == "noname") {
+    println("Error: input file name is mandatory.")
+    exit(1)
+}
+
+# Generate the NetCSV file.
+fs = fopen(input_file, "r")
+ft = fopen(output_file, "w")
+
+if ((line = fgets(fs)) == NULL) { 
+    fs = fclose(fs)
+    ft = fclose(ft)
+}
+
+while (!feof(fs)) {
+    if ((line = fgets(fs)) == NULL) { 
+        break
+    }
+
+    record = split(line, s1)
+
+    column1 = record[c1]
+    column2 = record[c2]
+    
+    if (length(column2) == 0) {
+        fputs(column1 + s3 + "NULL" + "\n", ft)
+        continue
+    }
+
+    try {
+        fields = split(eval(column2), s2)
+    }
+
+    try {
+        foreach(fields; n; v) {
+            fwrite(trim(column1, " \t\r\n") + s3 + "\"" + trim(v, " \t\r\n") + "\"" + "\n", ft)
+            fflush(ft)
+        }
+    }
+}
+
+fs = fclose(fs)
+ft = fclose(ft)
+

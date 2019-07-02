@@ -1,0 +1,190 @@
+#!/usr/local/bin/guash
+#
+# csvextract.gua
+#
+#     This script extract rows and/or columns from a CSV file.
+#
+# Copyright (C) 2011 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: csvextract.gua,v 1.0 2012/02/13 12:50:00 monteiro Exp $
+#
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "output.csv"
+isep = ","
+osep = ","
+columns = ""
+stoponblank = FALSE
+first_line = 0
+last_line = -1
+nlines = -1
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: csvextract option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: csvextract option1 value1 [option1 value1]")
+        println("-h    --help           show the options sumary")
+        println("-i                     input file")
+        println("-o                     output file")
+        println("      --isep           input file column separator(default=\",\")")
+        println("      --osep           output file column separator(default=\",\")")
+        println("      --columns        list of columns to copy")
+        println("      --first          first line to read(default=0)")
+        println("      --last           last line to read")
+        println("-n                     number of lines to read")
+        println("      --stoponblank    stop on first blank line")
+        
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "--isep") {
+        i = i + 1
+        isep = argv[i]
+    } elseif (argv[i] == "--osep") {
+        i = i + 1
+        osep = argv[i]
+    } elseif (argv[i] == "--columns") {
+        i = i + 1
+        columns = argv[i]
+    } elseif (argv[i] == "--first") {
+        i = i + 1
+        first_line = eval(argv[i])
+    } elseif (argv[i] == "--last") {
+        i = i + 1
+        last_line = eval(argv[i])
+    } elseif (argv[i] == "-n") {
+        i = i + 1
+        nlines = eval(argv[i])
+    } elseif (argv[i] == "--stoponblank") {
+        stoponblank = TRUE
+    }
+    i = i + 1
+} 
+
+# Get the current time...
+t1 = time();
+
+# Calculate the line number range...
+if (first_line < 0) {
+    first_line = 0
+}
+if (last_line < 0) {
+    if (nlines > 1) {
+        last = first_line + nlines - 1
+    }
+}
+if (last_line > -1) {
+    nlines = last_line - first_line + 1
+}
+
+fi = fopen(input_file, "r")
+fo = fopen(output_file, "w")
+
+println("Processing file " + input_file + "...\n")
+
+row = 0
+
+if (length(columns) > 0) {
+    columns_list = split(trim(columns, " \t\n"), ",")
+}
+
+while (!feof(fi)) {
+    if ((line = fgets(fi)) == NULL) {
+        break
+    }
+    
+    if (trim(line, " \t\n") != "") {
+        if (isep != " ") {
+            record = split(trim(line, " \t\n"), isep)
+        } else {
+            record = split(trim(line, " \t\n"))
+        }
+        
+        if (row >= first_line) {
+            if (stoponblank) {
+                if (trim(line, " \t\n") == "") {
+                    break
+                }
+            }
+            if (nlines >= 1) {
+                if (row < nlines) {
+                    if (length(columns) > 0) {
+                        data = ""
+                        foreach(columns_list; index; column) {
+                            col = eval(column)
+                            data = data + record[col] + osep
+                        }
+                        data = trim(data, osep) + "\n"
+                    } else {
+                        data = line
+                    }
+                    
+                    fputs(data, fo)
+                }
+            } else {
+                if (length(columns) > 0) {
+                    data = ""
+                    foreach(columns_list; index; column) {
+                        col = eval(column)
+                        data = data + record[col] + osep
+                    }
+                    data = trim(data, osep) + "\n"
+                } else {
+                    data = line
+                }
+                
+                fputs(data, fo)
+            }
+        }
+    } else {
+        if (row >= first_line) {
+            if (stoponblank) {
+                if (trim(line, " \t\n") == "") {
+                    break
+                }
+            }
+        }
+    }
+    
+    row = row + 1
+}
+
+fclose(fi)
+fclose(fo)
+
+# Get the current time...
+t2 = time();
+
+# Show the elapsed time...
+printf("Elapsed time to process file %s: %.3f seconds\n\n", input_file, t2 - t1)
+

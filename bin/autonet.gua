@@ -1,0 +1,466 @@
+#!/usr/local/bin/guash
+#
+# autonet.gua
+#
+#     This script simulates the evolution of a network based on a cellular automaton.
+#
+# Copyright (C) 2011 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: autonet.gua,v 1.0 2012/04/13 11:58:00 monteiro Exp $
+#
+
+# Set the package path.
+script_file = fsFullPath($argv[1]);
+script_path = fsPath(script_file);
+root_path = fsPath(script_path)
+
+if (exists("SYS_PKG_PATH")) {
+    last = length(SYS_PKG_PATH)
+    SYS_PKG_PATH[last] = root_path + "/lib"
+} else {
+    SYS_PKG_PATH[0] = root_path + "/lib"
+}
+
+# Load the required packages.
+include("cna")
+
+function cnaSaveFile(filename, adj, type = "edges") {
+    dim_adj = dim(adj)
+    dim_i = dim_adj[0]
+    dim_j = dim_adj[1]
+    
+    # Each line in a Pajek files must terminate with CR+LF.
+    # Windows will automaticly converts "\n" to "\r\n", but
+    # Linux will not.
+    if ($SYS_HOST == "linux") {
+        new_line = "\r\n"
+    } else {
+        new_line = "\n"
+    }
+
+    fp = fopen(filename, "w")
+
+    # Save vertices...
+    fputs("*Vertices " + (dim_i - 1) + new_line, fp)
+    for (i = 1; i < dim_i; i = i + 1) {
+        fputs(i + " \"" + adj[i, 0] + "\"" + new_line, fp)
+    }
+
+    # Save edges...
+    if (type == "edges") {
+        fputs("*Edges" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                if (adj[i, j] != 0) {
+                    fputs(i + " " + j + " " + adj[i, j] + new_line, fp)
+                }
+            }
+        }
+    # Save arcs...
+    } elseif (type == "arcs") {
+        fputs("*Arcs" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                if (adj[i, j] != 0) {
+                    fputs(i + " " + j + " " + adj[i, j] + new_line, fp)
+                }
+            }
+        }
+    # Save matrix...
+    } elseif (type == "matrix") {
+        fputs("*Matrix" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                fputs(" " + adj[i, j], fp)
+            }
+            fputs(new_line, fp)
+        }
+    }
+
+    fp = fclose(fp)
+}
+
+function cnaLoadFile(file_name) {
+    fp = fopen(file_name, "r")
+
+    file_section = "none"
+
+    while (!feof(fp)) {
+        if((line = fgets(fp)) == NULL) { 
+            break
+        }
+
+        #record = split(trim(line, " \t\r\n"), " \t")
+        record = split(trim(line, " \t\r\n"))
+
+        if ((tolower(record[0]) == "*vertices") || (tolower(record[0]) == "*edges") || (tolower(record[0]) == "*arcs") || (tolower(record[0]) == "*matrix")) {
+            file_section = tolower(record[0])
+            if (file_section == "*vertices") {
+                n = eval(record[1]) + 1
+                adj = matrix(0, n, n)
+            }
+            i = 0
+            continue
+        }
+
+        if (file_section == "*vertices") {
+            adj[0, i + 1] = eval(record[1])
+            adj[i + 1, 0] = eval(record[1])
+            i = i + 1
+        } elseif (file_section == "*edges") {
+            i = eval(record[0])
+            j = eval(record[1])
+            if (length(record) == 2) {
+                adj[i, j] = 1
+                adj[j, i] = 1
+            } else {
+                adj[i, j] = eval(record[2])
+                adj[j, i] = eval(record[2])
+            }
+        } elseif (file_section == "*arcs") {
+            i = eval(record[0])
+            j = eval(record[1])
+            if (length(record) == 2) {
+                adj[i, j] = 1
+            } else {
+                adj[i, j] = eval(record[2])
+            }
+        } elseif (file_section == "*matrix") {
+            foreach(record; j; v) {
+                adj[i + 1, j + 1] = eval(v)
+                if (i == n) {
+                    break
+                }
+            }
+            i = i + 1
+        }
+    }
+
+    fp = fclose(fp)
+
+    return(adj)
+}
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "output.net"
+log_file = "noname"
+sprefix = "sample"
+nsamples = 1
+index_from = 1
+index_to = 1
+index_in = 1
+ngen = 10
+neighbors = 2
+gameoflife = FALSE
+overwrite = FALSE
+useefficiency = FALSE
+snapshots = FALSE
+prefix = "snapshot"
+interval = 1
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: autonet option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: autonet option1 value1 [option1 value1]")
+        println("-h    --help        show the options sumary")
+        println("-i                  input file")
+        println("-o                  output file")
+        println("-l                  log file")
+        println("      --sprefix     sample file name prefix(default = \"sample\")")
+        println("      --nsamples    number of samples for multiple sample creation")
+        println("      --from        first file index for multiple sample creation")
+        println("      --to          last file index for multiple sample creation")
+        println("      --in          total number of files in the sample set")
+        println("      --ngen        number of generations(default = 10)")
+        println("      --neighbors   number of neighbors to compare to(default = 2)")
+        println("      --gameoflife  use the game of life rules")
+        println("      --overwrite   the automata overwrites the bitmap")
+        println("      --snapshots   take snapshots")
+        println("      --prefix      snapshot prefix(default = \"snapshot\")")
+        println("      --interval    snapshots interval(default = 1)")
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "-l") {
+        i = i + 1
+        log_file = argv[i]
+    } elseif (argv[i] == "--sprefix") {
+        i = i + 1
+        sprefix = argv[i]
+    } elseif (argv[i] == "--nsamples") {
+        i = i + 1
+        nsamples = eval(argv[i])
+    } elseif (argv[i] == "--from") {
+        i = i + 1
+        index_from = eval(argv[i])
+    } elseif (argv[i] == "--to") {
+        i = i + 1
+        index_to = eval(argv[i])
+    } elseif (argv[i] == "--in") {
+        i = i + 1
+        index_in = eval(argv[i])
+    } elseif (argv[i] == "--ngen") {
+        i = i + 1
+        ngen = eval(argv[i])
+    } elseif (argv[i] == "--neighbors") {
+        i = i + 1
+        neighbors = eval(argv[i])
+    } elseif (argv[i] == "--snapshots") {
+        snapshots = TRUE
+    } elseif (argv[i] == "--gameoflife") {
+        gameoflife = TRUE
+    } elseif (argv[i] == "--overwrite") {
+        overwrite = TRUE
+    } elseif (argv[i] == "--useefficiency") {
+        useefficiency = TRUE
+    } elseif (argv[i] == "--prefix") {
+        i = i + 1
+        prefix = argv[i]
+    } elseif (argv[i] == "--interval") {
+        i = i + 1
+        interval = eval(argv[i])
+    }
+    i = i + 1
+} 
+
+# Check if the input file name was suplied.
+if (input_file == "noname") {
+    println("Error: input file name is mandatory.")
+    exit(1)
+}
+
+t1 = time();
+
+# Create the log file...
+if (log_file != "noname") {
+    fl = fopen(log_file, "w")
+}
+
+# Calculate the file index number range...
+if (index_from < 1) {
+    index_from = 1
+}
+if (index_to <= 1) {
+    if (nsamples > 1) {
+        index_to = index_from + nsamples - 1
+    }
+}
+nsamples = index_to - index_from + 1
+if (index_in <= 1) {
+    index_in = nsamples
+}
+
+println("Generating " + nsamples + " samples, each one with " + ngen + " generations...\n")
+
+for (nf = index_from; nf <= index_to; nf = nf + 1) {
+    println("Generating sample " + nf + "...")
+    
+    # Get the current time...
+    ts1 = time();
+    
+    # Load the network file...
+    adj = cnaLoadFile(input_file)
+
+    dim_adj = dim(adj)
+    dim_i = dim_adj[0]
+    dim_j = dim_adj[1]
+    
+    if (nsamples > 1) {
+        output_file = sprefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", nf) + ".net"
+    }
+    
+    # Take a snapshot...
+    if (snapshots) {
+        # Save the network file...
+        if (nsamples > 1) {
+            cnaSaveFile(sprefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", nf) + "-" + prefix + "-" + sprintf("%0" + length(toString(ngen)) + "." + length(toString(ngen)) + "d", 0) + ".net", adj)
+        } else {
+            cnaSaveFile(prefix + "-" + sprintf("%0" + length(toString(ngen)) + "." + length(toString(ngen)) + "d", 0) + ".net", adj)
+        }
+    }
+    
+    # The evolution starts here...
+    for (n = 1; n <= ngen; n = n + 1) {
+        println("Getting sample " + nf + " generation " + n + "...")
+        
+        # Get the current time...
+        tg1 = time();
+        
+        geodesic = cnaShortestPath(adj)
+        vertex_efficiency = cnaVertexEfficiency(geodesic)
+        
+        if (!overwrite) {
+            new = adj
+        }
+        
+        # Connect or disconnect nodes based on the friendship efficiency...        
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                if (!((i == 0) && (j == 0) && (i == j))) {
+                    nelite = 0
+                    if (useefficiency) {
+                        if (i > 1) {
+                            if (vertex_efficiency[i - 1, j] > vertex_efficiency[i, j]) {
+                                nelite = nelite + 1
+                            }
+                        }
+                        if (i < (dim_i - 1)) {
+                            if (vertex_efficiency[i + 1, j] > vertex_efficiency[i, j]) {
+                                nelite = nelite + 1
+                            }
+                        }
+                        if (j > 1) {
+                            if (vertex_efficiency[i, j - 1] > vertex_efficiency[i, j]) {
+                                nelite = nelite + 1
+                            }
+                        }
+                        if (j < (dim_j - 1)) {
+                            if (vertex_efficiency[i, j + 1] > vertex_efficiency[i, j]) {
+                                nelite = nelite + 1
+                            }
+                        }
+                    } else {
+                        if (i > 1) {
+                            if (adj[i - 1, j] != 0) {
+                                nelite = nelite + 1
+                            }
+                        }
+                        if (i < (dim_i - 1)) {
+                            if (adj[i + 1, j] != 0) {
+                                nelite = nelite + 1
+                            }
+                        }
+                        if (j > 1) {
+                            if (adj[i, j - 1] != 0) {
+                                nelite = nelite + 1
+                            }
+                        }
+                        if (j < (dim_j - 1)) {
+                            if (adj[i, j + 1] != 0) {
+                                nelite = nelite + 1
+                            }
+                        }
+                    }
+                    
+                    if (gameoflife) {
+                        if (overwrite) {
+                            if (adj[i, j] == 1) {
+                                if ((nelite == 2) || (nelite == 3)) {
+                                    adj[i, j] = 1
+                                } else {
+                                    adj[i, j] = 0
+                                }
+                            } else {
+                                if (nelite == 3) {
+                                    adj[i, j] = 1
+                                }
+                            }
+                        } else {
+                            if (adj[i, j] == 1) {
+                                if ((nelite == 2) || (nelite == 3)) {
+                                    new[i, j] = 1
+                                } else {
+                                    new[i, j] = 0
+                                }
+                            } else {
+                                if (nelite == 3) {
+                                    new[i, j] = 1
+                                }
+                            }
+                        }
+                    } else {
+                        if (overwrite) {
+                            if (nelite >= neighbors) {
+                                adj[i, j] = 1
+                            } else {
+                                adj[i, j] = 0
+                            }
+                        } else {
+                            if (nelite >= neighbors) {
+                                new[i, j] = 1
+                            } else {
+                                new[i, j] = 0
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        if (!overwrite) {
+            adj = new
+        }
+        
+        # Take a snapshot...
+        if (snapshots) {
+            # Save the network file...
+            if (nsamples > 1) {
+                cnaSaveFile(sprefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", nf) + "-" + prefix + "-" + sprintf("%0" + length(toString(ngen)) + "." + length(toString(ngen)) + "d", n) + ".net", adj)
+            } else {
+                cnaSaveFile(prefix + "-" + sprintf("%0" + length(toString(ngen)) + "." + length(toString(ngen)) + "d", n) + ".net", adj)
+            }
+        }
+        
+        # Get the current time...
+        tg2 = time();
+        
+        # Show the elapsed time...
+        printf("Elapsed time to get this generation: %.3f seconds\n", tg2 - tg1)
+        
+        # Log the elapsed time...
+        if (log_file != "noname") {
+            fputs(sprintf("%d\t%d\t%.3f\n", nf, n, tg2 - tg1), fl)
+        }
+    }
+    
+    # Save the network file...
+    cnaSaveFile(output_file, adj)
+    
+    # Get the current time...
+    ts2 = time();
+    
+    # Show the elapsed time...
+    printf("Elapsed time to generate this sample: %.3f seconds\n\n", ts2 - ts1)
+}
+
+# Close the log file...
+if (log_file != "noname") {
+    fclose(fl)
+}
+
+# Get the current time...
+t2 = time();
+
+# Show the elapsed time...
+printf("Elapsed time to generate %d samples: %.3f seconds\n\n", nsamples, t2 - t1)
+

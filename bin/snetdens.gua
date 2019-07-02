@@ -1,0 +1,702 @@
+#!/usr/local/bin/guash
+#
+# snetdens.gua
+#
+#     This script creates a Pajek network file from a semantic file.
+#
+# Copyright (C) 2011 Roberto Luiz Souza Monteiro.
+#
+# This program is free soflware; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Soflware Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Soflware
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: snetdens.gua,v 1.2 2014/01/21 17:30:00 monteiro Exp $
+#
+
+function CNA_SaveFile(filename, adj, type = "edges") {
+    dim_adj = dim(adj)
+    dim_i = dim_adj[0]
+    dim_j = dim_adj[1]
+
+    # Each line in a Pajek files must terminate with CR+LF.
+    # Windows will automaticly converts "\n" to "\r\n", but
+    # Linux will not.
+    if ($SYS_HOST == "linux") {
+        new_line = "\r\n"
+    } else {
+        new_line = "\n"
+    }
+
+    fp = fopen(filename, "w")
+
+    # Save vertices...
+    fputs("*Vertices " + (dim_i - 1) + new_line, fp)
+    for (i = 1; i < dim_i; i = i + 1) {
+        fputs(i + " \"" + adj[i, 0] + "\"" + new_line, fp)
+    }
+
+    # Save edges...
+    if (type == "edges") {
+        fputs("*Edges" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                if (adj[i, j] != 0) {
+                    fputs(i + " " + j + " " + adj[i, j] + new_line, fp)
+                }
+            }
+        }
+    # Save arcs...
+    } elseif (type == "arcs") {
+        fputs("*Arcs" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                if (adj[i, j] != 0) {
+                    fputs(i + " " + j + " " + adj[i, j] + new_line, fp)
+                }
+            }
+        }
+    # Save matrix...
+    } elseif (type == "matrix") {
+        fputs("*Matrix" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                fputs(" " + adj[i, j], fp)
+            }
+            fputs(new_line, fp)
+        }
+    }
+
+    fp = fclose(fp)
+}
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "output.net"
+output_file_type = "edges"
+report_file = "output.rep"
+log_file = "output.log"
+log_all = FALSE
+mode = "clique"
+worder = FALSE
+rgrow = TRUE
+noadj = FALSE
+noadv = FALSE
+nonoun = FALSE
+nonotfound = FALSE
+nosigl = FALSE
+noverbs = FALSE
+calc_if = FALSE
+if_from = 0.0
+if_to = 0.0
+snapshots = FALSE
+prefix = "snapshot"
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: snetdens option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: snetdens option1 value1 [option1 value1]")
+        println("-h    --help          show the options sumary")
+        println("-i                    input file")
+        println("-o                    output file")
+        println("-t                    output file type(default=edges)")
+        println("-r                    report file")
+        println("-l                    log file")
+        println("-a                    log all")
+        println("      --mode          sentence insertion mode(default=clique),")
+        println("                      options=clique|cicle|chain")
+        println("      --worder        use weights to indicate reading order")
+        println("      --pg            population growing mode")
+        println("      --rg            relationship growing mode")
+        println("      --noadj         ignore adjectives")
+        println("      --noadv         ignore adverbs")
+        println("      --nonoun        ignore nouns")
+        println("      --nonotfound    ignore unknown words")
+        println("      --nosigl        ignore symbols")
+        println("      --noverbs       ignore verbs")
+        println("      --if            calculates the incidence fidelity(IF) index")
+        println("      --iffrom        the first IF value in range")
+        println("      --ifto          the last IF value in range")
+        println("      --ifstep        step to increese the IF index counter")
+        println("      --ifn           the number of IFs to take account")
+        println("      --snapshots     take snapshots")
+        println("      --prefix        snapshot prefix(default = \"snapshot\")")
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "-t") {
+        i = i + 1
+        output_file_type = argv[i]
+    } elseif (argv[i] == "-r") {
+        i = i + 1
+        report_file = argv[i]
+    } elseif (argv[i] == "-l") {
+        i = i + 1
+        log_file = argv[i]
+    } elseif (argv[i] == "-a") {
+        log_all = TRUE
+    } elseif (argv[i] == "--mode") {
+        i = i + 1
+        mode = argv[i]
+    } elseif (argv[i] == "--worder") {
+        worder = TRUE
+    } elseif (argv[i] == "--pg") {
+        rgrow = FALSE
+    } elseif (argv[i] == "--rg") {
+        rgrow = TRUE
+    } elseif (argv[i] == "--noadj") {
+        noadj = TRUE
+    } elseif (argv[i] == "--noadv") {
+        noadv = TRUE
+    } elseif (argv[i] == "--nonoun") {
+        nonoun = TRUE
+    } elseif (argv[i] == "--nonotfound") {
+        nonotfound = TRUE
+    } elseif (argv[i] == "--nosigl") {
+        nosigl = TRUE
+    } elseif (argv[i] == "--noverbs") {
+        noverbs = TRUE
+    } elseif (argv[i] == "--nohubs") {
+        nohubs = TRUE
+        i = i + 1
+        nhubs = eval(argv[i])
+    } elseif (argv[i] == "--if") {
+        calc_if = TRUE
+    } elseif (argv[i] == "--iffrom") {
+        i = i + 1
+        if_from = eval(argv[i])
+    } elseif (argv[i] == "--ifto") {
+        i = i + 1
+        if_to = eval(argv[i])
+    } elseif (argv[i] == "--snapshots") {
+        snapshots = TRUE
+    } elseif (argv[i] == "--prefix") {
+        i = i + 1
+        prefix = argv[i]
+    }
+    i = i + 1
+}
+
+# Check if the input file name was suplied.
+if (input_file == "noname") {
+    println("Error: input file name is mandatory.")
+    exit(1)
+}
+
+# Open report and log files...
+fr = fopen(report_file, "w")
+fl = fopen(log_file, "w")
+
+# Pass 1: get vertices...
+fp = fopen(input_file, "r")
+
+scount = 0
+n = 0
+
+while (!feof(fp)) {
+    if ((line = fgets(fp)) == NULL) { 
+        break
+    }
+
+    record = split(trim(line, " \t\r\n"), " \t")
+    word = record[0]
+    
+    if (word != "{S}") {
+        wclass = record[1]
+
+        if (noadj && (wclass == "A")) {
+            continue
+        }
+        if (noadv && (wclass == "ADV")) {
+            continue
+        }
+        if (nonoun && (wclass == "N")) {
+            continue
+        }
+        if (nonotfound && (wclass == "NOTFOUND")) {
+            continue
+        }
+        if (nosigl && (wclass == "SIGL")) {
+            continue
+        }
+        if (noverbs && (wclass == "V")) {
+            continue
+        }
+        
+        if (exists("vertex")) {
+            if (search(keys(vertex), word) == NULL) {
+                n = n + 1
+                vertex[word] = n
+                
+                if (calc_if) {
+                    slist = array(scount)
+                    wcount[word] = toString(slist)
+                }
+            } else {
+                if (calc_if) {
+                    slist = eval(wcount[word])
+                    slist[length(slist)] = scount
+                    wcount[word] = toString(slist)
+                }
+            }
+        } else {
+            n = n + 1
+            vertex[word] = n
+            
+            if (calc_if) {
+                slist = array(scount)
+                wcount[word] = toString(slist)
+            }
+        }
+        
+        if (calc_if) {
+            if (exists("sentences")) {
+                if (search(keys(sentences), scount) == NULL) {
+                    sentences[scount] = word
+                } else {
+                    sentences[scount] = sentences[scount] + "+" + word
+                }
+            } else {
+                sentences[scount] = word
+            }
+        }
+    } else {
+        scount = scount + 1
+    }
+}
+
+fp = fclose(fp)
+
+# Count the last sentence... 
+if ((length(word) > 0) && (word != "{S}")) {
+    scount = scount + 1
+}
+
+if (calc_if) {
+    # Total number of words in text...
+    nwords = 0
+    
+    foreach (wcount; key; value) {
+        nwords = nwords + length(eval(value))
+    }
+    
+    # Log statistics about the text vocabulary...
+    fputs("Total number of sentences: " + scount + "\n", fr)
+    fputs("Total number of words: " + nwords + "\n", fr)
+    fputs("Vocabulary: " + length(vertex) + "\n\n", fr)
+    
+    println("Total number of sentences: " + scount + "\n")
+    println("Total number of words: " + nwords + "\n")
+    println("Vocabulary: " + length(vertex) + "\n\n")
+    
+    total_pairs = length(vertex) * length(vertex)
+    pair_number = 1
+    
+    # Get the current time...
+    t0 = time();
+    t1 = time();
+    t2 = time();
+    
+    # Pass 2: calculate the IF...
+    foreach (wcount; w1; sw1) {
+        lsw1 = eval(sw1)
+        foreach (wcount; w2; sw2) {
+            wt = t2 - t1
+            et = t2 - t0
+            etc = wt * (total_pairs - pair_number)
+            println("Pass 1: searching pair " + pair_number + " of " + total_pairs + ". ET: " + roundl(et / 60.0) + " minute(s)." + " ETC: " + roundl(etc / 60.0) + " minute(s).")
+            t1 = time();
+            
+            if (w1 != w2) {
+                lsw2 = eval(sw2)
+                isw1sw2 = ""
+                if ((isw1sw2 = intersection(lsw1, lsw2)) != NULL) {
+                    foreach (isw1sw2; si; sn) {
+                        s = sentences[sn]
+                        
+                        wl = split(s, "+")
+                        
+                        w1pos = search(wl, w1)
+                        w2pos = search(wl, w2)
+                        
+                        if (w1pos < w2pos) {
+                            wpairs[w1 + "+" + w2] = length(isw1sw2)
+                        }
+                    }
+                } else {
+                    wpairs[w1 + "+" + w2] = 0
+                }
+            }
+            
+            pair_number = pair_number + 1
+            t2 = time();
+        }
+    }
+    
+    total_pairs = length(wpairs)
+    pair_number = 1
+    
+    # Get the current time...
+    t0 = time();
+    t1 = time();
+    t2 = time();
+    
+    # Calculate the IF and log...
+    foreach (wpairs; p; c) {
+        wt = t2 - t1
+        et = t2 - t0
+        etc = wt * (total_pairs - pair_number)
+        println("Pass 2: processing pair " + pair_number + " of " + total_pairs + ". ET: " + roundl(et / 60.0) + " minute(s)." + " ETC: " + roundl(etc / 60.0) + " minute(s).")
+        t1 = time();
+        
+        words = split(p, "+")
+        
+        I = 1.0 * c / scount
+        Fi = 1.0 * c / (length(eval(wcount[words[0]])) + length(eval(wcount[words[1]])) - c)
+        IF = 1.0 * I * Fi
+        
+        #if_pair = (1.0 * c ** 2) / (scount * (length(eval(wcount[words[0]])) + length(eval(wcount[words[1]])) - c))
+        I_wpairs[p]=I
+        Fi_wpairs[p]=Fi
+        if_wpairs[p]=IF
+        
+        pair_number = pair_number + 1
+        t2 = time();
+    }
+}
+
+# Log the pairs of words found in text...
+if (log_all) {
+    fputs("IF of pairs of words found in text:\n", fr)
+    fputs(sprintf("%-30.30s%10.10s%10.10s%10.10s%10.10s%10.10s\n", "Pair", "C_fi", "C_psi", "I", "Fi", "IF"), fr)
+    
+    total_pairs = length(wpairs)
+    pair_number = 1
+    
+    # Get the current time...
+    t0 = time();
+    t1 = time();
+    t2 = time();
+    
+    foreach (wpairs; p; c) {
+        wt = t2 - t1
+        et = t2 - t0
+        etc = wt * (total_pairs - pair_number)
+        println("Pass 3: saving pair " + pair_number + " of " + total_pairs + ". ET: " + roundl(et / 60.0) + " minute(s)." + " ETC: " + roundl(etc / 60.0) + " minute(s).")
+        t1 = time();
+        
+        words = split(p, "+")
+        
+        C_fi = length(eval(wcount[words[0]]))
+        C_psi = length(eval(wcount[words[1]]))
+        
+        if (if_wpairs[p] > 0.0) {
+            if ((if_from > 0.0) && (if_to > 0.0)) {
+                if ((if_wpairs[p] >= if_from) && (if_wpairs[p] <= if_to)) {
+                    fputs(sprintf("%-30.30s%10d%10d%10.6f%10.6f%10.6f\n", p, C_fi, C_psi, I_wpairs[p], Fi_wpairs[p], if_wpairs[p]), fr)
+                }
+            } elseif ((if_from > 0.0) && (if_to == 0.0)) {
+                if (if_wpairs[p] >= if_from) {
+                    fputs(sprintf("%-30.30s%10d%10d%10.6f%10.6f%10.6f\n", p, C_fi, C_psi, I_wpairs[p], Fi_wpairs[p], if_wpairs[p]), fr)
+                }
+            } elseif ((if_from == 0.0) && (if_to > 0.0)) {
+                if (if_wpairs[p] <= if_to) {
+                    fputs(sprintf("%-30.30s%10d%10d%10.6f%10.6f%10.6f\n", p, C_fi, C_psi, I_wpairs[p], Fi_wpairs[p], if_wpairs[p]), fr)
+                }
+            } else {
+                fputs(sprintf("%-30.30s%10d%10d%10.6f%10.6f%10.6f\n", p, C_fi, C_psi, I_wpairs[p], Fi_wpairs[p], if_wpairs[p]), fr)
+            }
+        }
+        
+        pair_number = pair_number + 1
+        t2 = time();
+    }
+}
+
+nvertices = length(vertex)
+
+edges = matrix(0, nvertices + 1, nvertices + 1)
+
+# Pass 3: get edges...
+fp = fopen(input_file, "r")
+
+# Recreate the vertices list, so the network density will be
+# correctly calculated...
+vertex = NULL
+n = 0
+snum = 0
+
+# Prepare the matrix...
+for (i = 0; i <= nvertices; i = i + 1) {
+    edges[0, i] = "v" + i
+    edges[i, 0] = "v" + i 
+}
+
+while (!feof(fp)) {
+    if ((line = fgets(fp)) == NULL) { 
+        break
+    }
+
+    record = split(trim(line, " \t\r\n"), " \t")
+    word = record[0]
+    
+    if (word != "{S}") {
+        wclass = record[1]
+
+        if (noadj && (wclass == "A")) {
+            continue
+        }
+        if (noadv && (wclass == "ADV")) {
+            continue
+        }
+        if (nonoun && (wclass == "N")) {
+            continue
+        }
+        if (nonotfound && (wclass == "NOTFOUND")) {
+            continue
+        }
+        if (nosigl && (wclass == "SIGL")) {
+            continue
+        }
+        if (noverbs && (wclass == "V")) {
+            continue
+        }
+        
+        try {
+            if (search(keys(vertex), word) == NULL) {
+                n = n + 1
+                vertex[word] = n
+            }
+        } catch {
+            n = n + 1
+            vertex[word] = n
+        }
+        
+        v[word] = vertex[word]
+        
+        if (exists("vertex")) {
+            if (search(keys(vertex), word) == NULL) {
+                n = n + 1
+                vertex[word] = n
+            }
+        } else {
+            n = n + 1
+            vertex[word] = n
+        }
+        
+        v[word] = vertex[word]
+    } else {
+        try {
+            if (mode == "clique") {
+                foreach (v; w1; i) {
+                    foreach (v; w2; j) {
+                        if (w1 != w2) {
+                            edges[i, j] = 1
+                        }
+                    }
+                }
+            } elseif (mode == "cicle") {
+                first = ""
+                previous = ""
+                wo = 0
+                
+                foreach (v; w1; j) {
+                    if (first == "") {
+                        first = w1
+                        previous = w1
+                        
+                        continue
+                    }
+                    
+                    i = v[previous]
+                    if (i != j) {
+                        if (worder) {
+                            wo = wo + 1
+                            edges[i, j] = wo
+                        } else {
+                            edges[i, j] = 1
+                        }
+                    }
+                    previous = w1
+                }
+                
+                i = v[first]
+                if (i != j) {
+                    if (worder) {
+                        wo = wo + 1
+                        edges[j, i] = wo
+                    } else {
+                        edges[j, i] = 1
+                    }
+                }
+            } elseif (mode == "chain") {
+                previous = ""
+                wo = 0
+                
+                foreach (v; w1; j) {
+                    if (previous == "") {
+                        previous = w1
+                        
+                        continue
+                    }
+                    
+                    i = v[previous]
+                    if (i != j) {
+                        if (worder) {
+                            wo = wo + 1
+                            edges[i, j] = wo
+                        } else {
+                            edges[i, j] = 1
+                        }
+                    }
+                    previous = w1
+                }
+            }
+            
+            v = NULL
+        }
+        
+        # Calculate the network density...
+        if (rgrow) {
+            density = (sum(edges) / 2) / (nvertices * (nvertices - 1) / 2)
+        } else {
+            density = (sum(edges, 1, 1, n, n) / 2) / (n * (n - 1) / 2)
+        }
+        
+        # Log the network density...
+        fputs(density + "\n", fl)
+        
+
+        # Take a snapshot...
+        if (snapshots) {
+            snum = snum + 1
+            
+            # Save the network file...
+            CNA_SaveFile(prefix + "-" + sprintf("%0" + length(toString(scount)) + "." + length(toString(scount)) + "d", snum) + ".net", edges, output_file_type)
+        }
+    }
+}
+# Get last edges...
+try {
+    if (mode == "clique") {
+        if (length(v) > 1) {
+            foreach (v; w1; i) {
+                foreach (v; w2; j) {
+                    if (w1 != w2) {
+                        edges[i, j] = 1
+                    }
+                }
+            }
+        }
+    } elseif (mode == "cicle") {
+        first = ""
+        previous = ""
+        wo = 0
+
+        foreach (v; w1; j) {
+            if (first == "") {
+                first = w1
+                previous = w1
+                
+                continue
+            }
+            
+            i = v[previous]
+            if (i != j) {
+                if (worder) {
+                    wo = wo + 1
+                    edges[i, j] = wo
+                } else {
+                    edges[i, j] = 1
+                }
+            }
+            previous = w1
+        }
+
+        i = v[first]
+        if (i != j) {
+            if (worder) {
+                wo = wo + 1
+                edges[j, i] = wo
+            } else {
+                edges[j, i] = 1
+            }
+        }
+    } elseif (mode == "chain") {
+        previous = ""
+        wo = 0
+
+        foreach (v; w1; j) {
+            if (previous == "") {
+                previous = w1
+                
+                continue
+            }
+            
+            i = v[previous]
+            if (i != j) {
+                if (worder) {
+                    wo = wo + 1
+                    edges[i, j] = wo
+                } else {
+                    edges[i, j] = 1
+                }
+            }
+            previous = w1
+        }
+    }
+}
+
+# Calculate the network density...
+if (rgrow) {
+    density = (sum(edges) / 2) / (nvertices * (nvertices - 1) / 2)
+} else {
+    density = (sum(edges, 1, 1, n, n) / 2) / (n * (n - 1) / 2)
+}
+
+# Log the network density...
+fputs(density + "\n", fl)
+
+# Take a snapshot...
+if (snapshots) {
+    # Save the network file...
+    CNA_SaveFile(prefix + "-" + sprintf("%0" + length(toString(scount)) + "." + length(toString(scount)) + "d", 0) + ".net", edges, output_file_type)
+}
+
+fp = fclose(fp)
+fr = fclose(fr)
+fl = fclose(fl)
+
+# Prepare the matrix...
+foreach (vertex; word; index) {
+    edges[0, index] = word
+    edges[index, 0] = word    
+}
+
+# Save network...
+CNA_SaveFile(output_file, edges, output_file_type)
+

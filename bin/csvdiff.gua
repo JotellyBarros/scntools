@@ -1,0 +1,172 @@
+#!/usr/local/bin/guash
+#
+# csvdiff.gua
+#
+#     This script calculates the difference CSV file, from two CSV files.
+#
+# Copyright (C) 2011 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: csvdiff.gua,v 1.1 2012/04/02 07:29:00 monteiro Exp $
+#
+
+#
+# Configuration variables.
+#
+input_file1 = "noname"
+input_file2 = "noname"
+output_file = "output.csv"
+separator = ","
+skipfirst = FALSE
+mode = "absolute"
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: csvdiff option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: csvdiff option1 value1 [option1 value1]")
+        println("-h    --help         show the options sumary")
+        println("      --i1           input file 1")
+        println("      --i2           input file 2")
+        println("      --o            output file")
+        println("      --skipfirst    first line to read(default=0)")
+        println("      --mode         difference mode(default=\"absolute\")")
+        
+        exit(0)
+    } elseif (argv[i] == "--i1") {
+        i = i + 1
+        input_file1 = argv[i]
+    } elseif (argv[i] == "--i2") {
+        i = i + 1
+        input_file2 = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "--separator") {
+        i = i + 1
+        separator = argv[i]
+    } elseif (argv[i] == "--skipfirst") {
+        skipfirst = TRUE
+    } elseif (argv[i] == "--mode") {
+        i = i + 1
+        mode = argv[i]
+    }
+    i = i + 1
+} 
+
+
+# Check if the input file names were suplied.
+if (input_file1 == "noname") {
+    println("Error: input file name is mandatory.")
+    exit(1)
+}
+if (input_file2 == "noname") {
+    println("Error: input file name is mandatory.")
+    exit(1)
+}
+
+# Get the current time...
+t1 = time();
+
+# Create the difference file...
+f1 = fopen(input_file1, "r")
+f2 = fopen(input_file2, "r")
+
+fd = fopen(output_file, "w")
+
+rows = 0
+
+while (!feof(f1)) {
+    if ((line1 = fgets(f1)) == NULL) {
+        break
+    }
+    if ((line2 = fgets(f2)) == NULL) {
+        break
+    }
+    
+    rows = rows + 1
+    
+    if (rows == 1) {
+        if (skipfirst) {
+            continue
+        }
+    }
+    
+    if (separator != " ") {
+        record1 = split(trim(line1, " \t\n"), separator)
+        record2 = split(trim(line2, " \t\n"), separator)
+    } else {
+        record1 = split(trim(line1, " \t\n"))
+        record2 = split(trim(line2, " \t\n"))
+    }
+    
+    data = ""
+    foreach (record1; column; value) {
+        x1 = eval(value)
+        x2 = eval(record2[column])
+        
+        if (mode == "absolute") {
+            if (!((type(x1) == GUA_STRING) && (type(x2) == GUA_STRING))) {
+                data = data + toString(x1 - x2) + separator
+            } else {
+                data = data + sprintf("\"%s\"%s", x1, separator)
+            }            
+        } elseif (mode == "relative") {
+            if (!((type(x1) == GUA_STRING) && (type(x2) == GUA_STRING))) {
+                if (fmax((x1 * 1.0), (x2 * 1.0)) != 0) {
+                    data = data + sprintf("%f%s", fabs(x1 - x2) / fabs(fmax((x1 * 1.0), (x2 * 1.0))), separator)
+                } else {
+                    data = data + sprintf("%f%s", 0.0, separator)
+                }
+            } else {
+                data = data + sprintf("\"%s\"%s", x1, separator)
+            }            
+        } elseif (mode == "percentage") {
+            if (!((type(x1) == GUA_STRING) && (type(x2) == GUA_STRING))) {
+                if (x2 != 0) {
+                    data = data + sprintf("%f%s", ((x1 - x2) / (x2 * 1.0) * 100.0), separator)
+                } else {
+                    data = data + sprintf("%f%s", 0.0, separator)
+                }
+            } else {
+                data = data + sprintf("\"%s\"%s", x1, separator)
+            }            
+        }
+    }
+    data = trim(data, separator)
+    
+    fputs(data + "\n", fd)
+}
+
+fclose(f1)
+fclose(f2)
+
+fclose(fd)
+
+# Get the current time...
+t2 = time();
+
+# Show the elapsed time...
+printf("Elapsed time: %.3f seconds\n\n", t2 - t1)
+

@@ -1,0 +1,300 @@
+#!/usr/local/bin/guash
+#
+# mkrndaffnet.gua
+#
+#     This script creates a Pajek network file from a CSV file,
+#     containing the actors chromosomes.
+#
+# Copyright (C) 2013 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: mkrndaffnet.gua,v 1.0 2013/02/09 22:06:00 monteiro Exp $
+#
+
+function CNA_SaveFile(filename, adj, type = "edges") {
+    dim_adj = dim(adj)
+    dim_i = dim_adj[0]
+    dim_j = dim_adj[1]
+
+    # Each line in a Pajek files must terminate with CR+LF.
+    # Windows will automaticly converts "\n" to "\r\n", but
+    # Linux will not.
+    if ($SYS_HOST == "linux") {
+        new_line = "\r\n"
+    } else {
+        new_line = "\n"
+    }
+
+    fp = fopen(filename, "w")
+
+    # Save vertices...
+    fputs("*Vertices " + (dim_i - 1) + new_line, fp)
+    for (i = 1; i < dim_i; i = i + 1) {
+        fputs(i + " \"" + adj[i, 0] + "\"" + new_line, fp)
+    }
+
+    # Save edges...
+    if (type == "edges") {
+        fputs("*Edges" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                if (adj[i, j] != 0) {
+                    fputs(i + " " + j + " " + adj[i, j] + new_line, fp)
+                }
+            }
+        }
+    # Save arcs...
+    } elseif (type == "arcs") {
+        fputs("*Arcs" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                if (adj[i, j] != 0) {
+                    fputs(i + " " + j + " " + adj[i, j] + new_line, fp)
+                }
+            }
+        }
+    # Save matrix...
+    } elseif (type == "matrix") {
+        fputs("*Matrix" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                fputs(" " + adj[i, j], fp)
+            }
+            fputs(new_line, fp)
+        }
+    }
+
+    fp = fclose(fp)
+}
+
+#
+# Configuration variables.
+#
+output_file = "output.csv"
+output_file_type = "edges"
+report_file = "output.rep"
+# Number of individuals.
+nindividuals = 0
+# Number of genes.
+ngenes = 0
+# Percentage of genes with value 1.
+pgene = 0
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: mkrndaffnet option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: mkrndaffnet option1 value1 [option1 value1]")
+        println("-h    --help    show the options sumary")
+        println("-o              output file")
+        println("-t              output file type(default=\"edges\")")
+        println("-r              report file")
+        println("-n              number of individuals(default=0)")
+        println("-g              number of genes(default=0)")
+        println("-p              percentage of genes with value 1(default=0)")
+        exit(0)
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "-t") {
+        i = i + 1
+        output_file_type = argv[i]
+    } elseif (argv[i] == "-r") {
+        i = i + 1
+        report_file = argv[i]
+    } elseif (argv[i] == "-n") {
+        i = i + 1
+        nindividuals = eval(argv[i])
+    } elseif (argv[i] == "-g") {
+        i = i + 1
+        ngenes = eval(argv[i])
+    } elseif (argv[i] == "-p") {
+        i = i + 1
+        pgene = eval(argv[i])
+    }
+    i = i + 1
+} 
+
+# Get the current time...
+t1 = time();
+
+# Use the time as seed to the random number generator...
+srandom(time)
+
+# Create the network matrix...
+adj = adj = matrix(0, nindividuals + 1, nindividuals + 1)
+
+dim_adj = dim(adj)
+dim_i = dim_adj[0]
+dim_j = dim_adj[1]
+
+# Generate vertex chromosomes...
+for (i = 1; i <= nindividuals; i = i + 1) {
+    for (j = 1; j <= ngenes; j = j + 1) {
+        p = random()
+        
+        if (p < pgene) {
+            gene[j] = 1
+        } else {
+            gene[j] = 0
+        }
+    }
+    
+    adj[0, i] = "v" + i + "," + trim(toString(gene), "{}")
+    adj[i, 0] = "v" + i + "," + trim(toString(gene), "{}")
+}
+
+CNA_SaveFile(output_file, adj, output_file_type)
+
+# Calculate the affinity between two vertices and stores it inside the affinity matrix...
+for (i = 1; i < dim_i; i = i + 1) {
+    for (j = 1; j < dim_j; j = j + 1) {
+        if (i != j) {
+            node1 = split(adj[i, 0], ",")
+            node2 = split(adj[0, j], ",")
+            
+            nattributes = length(node1) - 1
+            
+            c = 0
+            for (index = 1; index <= nattributes; index = index + 1) {
+                if ((node1[index] == 1) && (node2[index] == 1)) {
+                    c = c + 1
+                }
+            }
+            
+            affinity = (c * 1.0) / (nattributes * 1.0)
+            adj[i, j] = affinity
+        }
+    }
+}
+
+# Calculate statistics...
+sx = 0
+sx2 = 0
+n = 0
+
+min_affinity = 0
+max_affinity = 0
+
+for (i = 1; i < dim_i; i = i + 1) {
+    for (j = 1; j < dim_j; j = j + 1) {
+        # Calculate the frequency distribution, the min, max and average affinity...
+        # Get the frequency distribution...
+        try {
+            freqdist[toString(adj[i, j])] = freqdist[toString(adj[i, j])] + 1
+        } catch {
+            freqdist[toString(adj[i, j])] = 1
+        }
+        if (min_affinity == 0) {
+            min_affinity = adj[i, j]
+        }
+        if (max_affinity == 0) {
+            max_affinity = adj[i, j]
+        }
+        if (min_affinity > adj[i, j]) {
+            min_affinity = adj[i, j]
+        }
+        if (max_affinity < adj[i, j]) {
+            max_affinity = adj[i, j]
+        }
+        
+        x = adj[i, j]
+        
+        sx = sx + x
+        sx2 = sx2 + x * x
+        
+        n = n + 1
+    }
+}
+
+# Calculate the percentage frequency distribution...
+hist = matrix(0, length(freqdist), 3)
+dim_hist = dim(hist)
+
+i = 0
+foreach(freqdist; v; f) {
+    hist[i, 0] = eval(v)
+    hist[i, 1] = f
+	i = i + 1
+}
+
+sumfreqs = sum(hist, 0, 1, dim_hist[0] - 1, 1)
+
+for (i = 0; i < dim_hist[0]; i = i + 1) {
+    hist[i, 2] = (hist[i, 1] / (sumfreqs * 1.0)) * 100.0
+}
+
+# Sort the frequency distribution...
+for (i = 0; i < dim_hist[0] - 1; i = i + 1) {
+    for (j = i; j < dim_hist[0]; j = j + 1) {
+        if (hist[i, 0] > hist[j, 0]) {
+            v = hist[i, 0]
+            hist[i, 0] = hist[j, 0]
+            hist[j, 0] = v
+            
+            f = hist[i, 1]
+            hist[i, 1] = hist[j, 1]
+            hist[j, 1] = f
+            
+            p = hist[i, 2]
+            hist[i, 2] = hist[j, 2]
+            hist[j, 2] = p
+        }
+    }
+}
+
+avg_affinity = sx / n
+deviation = sqrt((sx2 - (sx * sx) / n) / (n - 1))
+
+# Save results...
+fr = fopen(report_file, "w")
+
+fputs("Number of individuals: " + nindividuals + "\n", fr)
+fputs("Number of genes: " + ngenes + "\n", fr)
+fputs("Percentage of genes with value 1: " + pgene + "\n\n", fr)
+
+fputs("Min. affinity value: " + min_affinity + "\n", fr)
+fputs("Avg. affinity value: " + avg_affinity + "\n", fr)
+fputs("Max. affinity value: " + max_affinity + "\n", fr)
+fputs("Deviation: " + deviation + "\n", fr)
+fputs("Events: " + n + "\n\n", fr)
+
+fputs("Frequency distribution:\n", fr)
+
+line = sprintf("%15s%15s%15s\n", "Value", "Frequency", "Frequency(%)")
+fputs(line, fr)
+
+for (i = 0; i < dim_hist[0]; i = i + 1) {
+    line = sprintf("%15.3f%15.0f%15.3f\n", hist[i, 0], hist[i, 1], hist[i, 2])
+    fputs(line, fr)
+}
+
+fr = fclose(fr)
+
+# Get the current time...
+t2 = time();
+
+# Show the elapsed time...
+printf("Elapsed time to generate the random network file %s: %.3f seconds\n\n", output_file, t2 - t1)
+

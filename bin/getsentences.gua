@@ -1,0 +1,188 @@
+#!/usr/local/bin/guash
+#
+# getsentences.gua
+#
+#     This script get sentences from a semantic file and save it in another file.
+#
+# Copyright (C) 2011 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: getsentences.gua,v 1.0 2016/12/27 14:23:00 monteiro Exp $
+#
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "output.txt"
+prefix = "sample"
+nfiles = 1
+
+if ($SYS_HOST == "linux") {
+    new_line = "\r\n"
+} else {
+    new_line = "\n"
+}
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: getsentences option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: getsentences option1 value1 [option1 value1]")
+        println("-h    --help          show the options sumary")
+        println("-i                    input file")
+        println("-o                    output file")
+        println("      --prefix        file name prefix for multiple file creation")
+        println("      --nfiles        number of files for multiple file creation")
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "--prefix") {
+        i = i + 1
+        prefix = argv[i]
+    } elseif (argv[i] == "--nfiles") {
+        i = i + 1
+        nfiles = eval(argv[i])
+    }
+    i = i + 1
+}
+
+# Check if the input file name was suplied.
+if (input_file == "noname") {
+    println("Error: input file name is mandatory.")
+    exit(1)
+}
+
+# Get every sentence from the source file and count it...
+fs = fopen(input_file, "r")
+
+n = 0
+
+# Store and count sentences...
+println("Counting sentences...")
+
+while (!feof(fs)) {
+    if ((line = fgets(fs)) == NULL) { 
+        break
+    }
+
+    record = split(trim(line, " \t\r\n"), " \t")
+    word = record[0]
+
+    if (word == "{S}") {
+        if (exists("sentence")) {
+            s = ""
+            foreach (sentence; w; c) {
+                s = s + w + "\t" + c + ";"
+            }
+            sentences[n] = trim(s, ";")
+            sentence = NULL
+            
+            n = n + 1
+        }
+    } else {
+        wclass = record[1]
+        sentence[word] = wclass
+    }
+}
+
+if ((length(word) > 0) && (word != "{S}")) {
+    if (exists("sentence")) {
+        s = ""
+        foreach (sentence; w; c) {
+            s = s + w + "\t" + c + ";"
+        }
+        sentences[n] = trim(s, ";")
+        sentence = NULL
+        
+        n = n + 1
+    }
+}
+
+fs = fclose(fs)
+
+println("Found " + n + " sentences.")
+
+t1 = time();
+
+nsi = roundl(n / nfiles)
+
+ns = nsi
+
+for (i = 1; i <= nfiles; i = i + 1) {
+    println("Generating sample " + i + "...")
+    
+    # Get the current time...
+    ts1 = time();
+    
+    if (nfiles > 1) {
+        output_file = prefix + "-" + sprintf("%0" + length(toString(nfiles)) + "." + length(toString(nfiles)) + "d", i) + ".txt"
+    }
+        
+    ft = fopen(output_file, "w")
+    
+    println("Saving files...")
+    
+    j = 1
+    
+    foreach (sentences; k; v) {
+        if (j > ns) {
+            break
+        }
+        
+        s = split(v, ";")
+        foreach (s; nw; w) {
+            fputs(w + new_line, ft);
+        }
+        
+        if (j < ns) {
+            fputs("{S}" + new_line, ft);
+        }
+        
+        j = j + 1
+    }
+    
+    ns = ns + nsi
+    
+    ft = fclose(ft)
+    
+    # Get the current time...
+    ts2 = time();
+    
+    # Show the elapsed time...
+    printf("Elapsed time to generate this sample: %.3f seconds\n\n", ts2 - ts1)
+}
+
+# Get the current time...
+t2 = time();
+
+# Show the elapsed time...
+printf("Elapsed time to generate %d samples: %.3f seconds\n\n", nfiles, t2 - t1)
+
+exit(0)
+

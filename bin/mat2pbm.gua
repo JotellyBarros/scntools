@@ -1,0 +1,241 @@
+#!/usr/local/bin/guash
+#
+# mat2pbm.gua
+#
+#     This script creates a PBM file representing an adjacence matrix.
+#
+# Copyright (C) 2012 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: mat2pbm.gua,v 1.0 2012/07/20 06:15:00 monteiro Exp $
+#
+
+function CNA_SavePBM(filename, adj) {
+    dim_adj = dim(adj)
+    dim_i = dim_adj[0]
+    dim_j = dim_adj[1]
+    
+    fp = fopen(filename, "w")
+    
+    # Save the Netpbm format type and the image size...
+    fputs("P1\n" , fp)
+    fputs("" + (dim_j - 1) + " " + (dim_i - 1) + "\n" , fp)
+
+    # Save the PBM matrix...
+    for (i = 1; i < dim_i; i = i + 1) {
+        for (j = 1; j < dim_j; j = j + 1) {
+            fputs(adj[i, j] + " ", fp)
+        }
+        fputs("\n", fp)
+    }
+    
+    fp = fclose(fp)
+}
+
+function CNA_LoadFile(file_name) {
+    fp = fopen(file_name, "r")
+
+    file_section = "none"
+
+    while (!feof(fp)) {
+        if((line = fgets(fp)) == NULL) { 
+            break
+        }
+
+        #record = split(trim(line, " \t\r\n"), " \t")
+        record = split(trim(line, " \t\r\n"))
+
+        if ((tolower(record[0]) == "*vertices") || (tolower(record[0]) == "*edges") || (tolower(record[0]) == "*arcs") || (tolower(record[0]) == "*matrix")) {
+            file_section = tolower(record[0])
+            if (file_section == "*vertices") {
+                n = eval(record[1]) + 1
+                adj = matrix(0, n, n)
+            }
+            i = 0
+            continue
+        }
+
+        if (file_section == "*vertices") {
+            adj[0, i + 1] = eval(record[1])
+            adj[i + 1, 0] = eval(record[1])
+            i = i + 1
+        } elseif (file_section == "*edges") {
+            i = eval(record[0])
+            j = eval(record[1])
+            if (length(record) == 2) {
+                adj[i, j] = 1
+                adj[j, i] = 1
+            } else {
+                adj[i, j] = eval(record[2])
+                adj[j, i] = eval(record[2])
+            }
+        } elseif (file_section == "*arcs") {
+            i = eval(record[0])
+            j = eval(record[1])
+            if (length(record) == 2) {
+                adj[i, j] = 1
+            } else {
+                adj[i, j] = eval(record[2])
+            }
+        } elseif (file_section == "*matrix") {
+            foreach(record; j; v) {
+                adj[i + 1, j + 1] = eval(v)
+                if (i == n) {
+                    break
+                }
+            }
+            i = i + 1
+        }
+    }
+
+    fp = fclose(fp)
+
+    return(adj)
+}
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "output.pbm"
+log_file = "noname"
+prefix = "sample"
+nfiles = 1
+index_from = 1
+index_to = 1
+index_in = 1
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: mat2pbm option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: mat2pbm option1 value1 [option1 value1]")
+        println("-h    --help      show the options sumary")
+        println("-i                input file")
+        println("-o                output file")
+        println("-l                log file")
+        println("      --prefix    prefix for multiple file creation(default=\"sample\")")
+        println("      --nfiles    number of files for multiple file creation")
+        println("      --from      first file index for multiple file creation")
+        println("      --to        last file index for multiple file creation")
+        println("      --in        total number of files in the file set")
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "-l") {
+        i = i + 1
+        log_file = argv[i]
+    } elseif (argv[i] == "--prefix") {
+        i = i + 1
+        prefix = argv[i]
+    } elseif (argv[i] == "--nfiles") {
+        i = i + 1
+        nfiles = eval(argv[i])
+    } elseif (argv[i] == "--from") {
+        i = i + 1
+        index_from = eval(argv[i])
+    } elseif (argv[i] == "--to") {
+        i = i + 1
+        index_to = eval(argv[i])
+    } elseif (argv[i] == "--in") {
+        i = i + 1
+        index_in = eval(argv[i])
+    }
+    i = i + 1
+} 
+
+# Get the current time...
+t1 = time();
+
+# Create the log file...
+if (log_file != "noname") {
+    fl = fopen(log_file, "w")
+}
+
+# Calculate the file index number range...
+if (index_from < 1) {
+    index_from = 1
+}
+if (index_to <= 1) {
+    if (nfiles > 1) {
+        index_to = index_from + nfiles - 1
+    }
+}
+nfiles = index_to - index_from + 1
+if (index_in <= 1) {
+    index_in = nfiles
+}
+
+println("Processing " + nfiles + " files...\n")
+
+# Start file creation...
+for (nf = index_from; nf <= index_to; nf = nf + 1) {
+    # Get the current time...
+    ts1 = time();
+    
+    if (nfiles > 1) {
+        input_file = prefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", nf) + ".net"
+    }
+    
+    # Load the network file...
+    println("Loading file " + input_file + "...")
+        
+    adj = CNA_LoadFile(input_file)
+    
+    if (nfiles > 1) {
+        output_file = prefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", nf) + ".pbm"
+    }
+    
+    # Save the network file...
+    println("Saving file " + output_file + "...")
+    
+    CNA_SavePBM(output_file, adj)
+    
+    # Get the current time...
+    ts2 = time();
+    
+    # Show the elapsed time...
+    printf("Elapsed time to generate this file: %.3f seconds\n\n", ts2 - ts1)
+    
+    # Log the elapsed time...
+    if (log_file != "noname") {
+        fputs(sprintf("%d\t%.3f\n", nf, ts2 - ts1), fl)
+    }
+}
+
+# Close the log file...
+if (log_file != "noname") {
+    fclose(fl)
+}
+
+# Get the current time...
+t2 = time();
+
+# Show the elapsed time...
+printf("Elapsed time to generate %d files: %.3f seconds\n\n", nfiles, t2 - t1)
+

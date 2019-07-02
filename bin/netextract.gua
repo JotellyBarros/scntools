@@ -1,0 +1,270 @@
+#!/usr/local/bin/guash
+#
+# netextract.gua
+#
+#     This script extracts the selected mode from a bi-modal network.
+#
+# Copyright (C) 2011 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: netextract.gua,v 1.0 2011/06/18 18:16:00 monteiro Exp $
+#
+
+function CNA_SaveFile(filename, adj, type = "edges") {
+    dim_adj = dim(adj)
+    dim_i = dim_adj[0]
+    dim_j = dim_adj[1]
+
+    # Each line in a Pajek files must terminate with CR+LF.
+    # Windows will automaticly converts "\n" to "\r\n", but
+    # Linux will not.
+    if ($SYS_HOST == "linux") {
+        new_line = "\r\n"
+    } else {
+        new_line = "\n"
+    }
+
+    fp = fopen(filename, "w")
+
+    # Save vertices...
+    fputs("*Vertices " + (dim_i - 1) + new_line, fp)
+    for (i = 1; i < dim_i; i = i + 1) {
+        fputs(i + " \"" + adj[i, 0] + "\"" + new_line, fp)
+    }
+
+    # Save edges...
+    if (type == "edges") {
+        fputs("*Edges" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                if (adj[i, j] != 0) {
+                    fputs(i + " " + j + " " + adj[i, j] + new_line, fp)
+                }
+            }
+        }
+    # Save arcs...
+    } elseif (type == "arcs") {
+        fputs("*Arcs" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                if (adj[i, j] != 0) {
+                    fputs(i + " " + j + " " + adj[i, j] + new_line, fp)
+                }
+            }
+        }
+    # Save matrix...
+    } elseif (type == "matrix") {
+        fputs("*Matrix" + new_line, fp)
+        for (i = 1; i < dim_i; i = i + 1) {
+            for (j = 1; j < dim_j; j = j + 1) {
+                fputs(" " + adj[i, j], fp)
+            }
+            fputs(new_line, fp)
+        }
+    }
+
+    fp = fclose(fp)
+}
+
+function CNA_LoadFile(file_name) {
+    fp = fopen(file_name, "r")
+
+    file_section = "none"
+
+    while (!feof(fp)) {
+        if((line = fgets(fp)) == NULL) { 
+            break
+        }
+
+        #record = split(trim(line, " \t\r\n"), " \t")
+        record = split(trim(line, " \t\r\n"))
+
+        if ((tolower(record[0]) == "*vertices") || (tolower(record[0]) == "*edges") || (tolower(record[0]) == "*arcs") || (tolower(record[0]) == "*matrix")) {
+            file_section = tolower(record[0])
+            if (file_section == "*vertices") {
+                n = eval(record[1]) + 1
+                adj = matrix(0, n, n)
+                
+                if (length(record) > 2) {
+                    adj[0, 0] = eval(record[2])
+                }
+            }
+            i = 0
+            continue
+        }
+
+        if (file_section == "*vertices") {
+            adj[0, i + 1] = eval(record[1])
+            adj[i + 1, 0] = eval(record[1])
+            i = i + 1
+        } elseif (file_section == "*edges") {
+            i = eval(record[0])
+            j = eval(record[1])
+            if (length(record) == 2) {
+                adj[i, j] = 1
+                adj[j, i] = 1
+            } else {
+                adj[i, j] = eval(record[2])
+                adj[j, i] = eval(record[2])
+            }
+        } elseif (file_section == "*arcs") {
+            i = eval(record[0])
+            j = eval(record[1])
+            if (length(record) == 2) {
+                adj[i, j] = 1
+            } else {
+                adj[i, j] = eval(record[2])
+            }
+        } elseif (file_section == "*matrix") {
+            foreach(record; j; v) {
+                adj[i + 1, j + 1] = eval(v)
+                if (i == n) {
+                    break
+                }
+            }
+            i = i + 1
+        }
+    }
+
+    fp = fclose(fp)
+
+    return(adj)
+}
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "noname"
+output_file_type = "edges"
+# Mode to extract.
+mode = 1
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: netextract option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: netextract option1 value1 [option1 value1]")
+        println("-h    --help             show the options sumary")
+        println("-i                       input file")
+        println("-o                       output file")
+        println("-t                       output file type(default=edges)")
+        println("      --mode             mode to extract(default=1)")
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "-t") {
+        i = i + 1
+        output_file_type = argv[i]
+    } elseif (argv[i] == "--mode") {
+        i = i + 1
+        mode = eval(argv[i])
+    }
+    i = i + 1
+} 
+
+# Check if the input file name was suplied.
+if (input_file == "noname") {
+    println("Error: input file name is mandatory.")
+    exit(1)
+}
+
+# Load the network file.
+adj = CNA_LoadFile(input_file)
+
+nvertices_mode1 = adj[0, 0]
+
+if (nvertices_mode1 == 0) {
+    println("Error: it is not a two modes network.")
+    exit(1)
+}
+
+dim_adj = dim(adj)
+dim_i = dim_adj[0]
+dim_j = dim_adj[1]
+
+# Extract mode...
+if (mode == 1) {
+    for (i = 1; i < dim_i; i = i + 1) {
+        for (j = 1; j < dim_j; j = j + 1) {
+            if (i != j) {
+                for (k = (nvertices_mode1 + 1); k < dim_i; k = k + 1) {
+                    if (adj[k, i] != 0) {
+                        if (adj[k, j] != 0) {
+                            adj[i, j] = 1
+                            adj[j, i] = 1
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    # Copy network mode to a new matrix...
+    madj = matrix(0, nvertices_mode1 + 1, nvertices_mode1 + 1)
+    for (i = 0; i <= nvertices_mode1; i = i + 1) {
+        for (j = 0; j <= nvertices_mode1; j = j + 1) {
+            madj[i, j] = adj[i, j]
+        }
+    }
+    adj = madj
+    madj = NULL
+} else {
+    for (i = (nvertices_mode1 + 1); i < dim_i; i = i + 1) {
+        for (j = (nvertices_mode1 + 1); j < dim_j; j = j + 1) {
+            if (i != j) {
+                for (k = 1; k <= nvertices_mode1; k = k + 1) {
+                    if ((adj[k, i] == 1) && (adj[k, j] == 1)) {
+                        adj[i, j] = 1
+                        adj[j, i] = 1
+                    }
+                }
+            }
+        }
+    }
+    
+    # Copy network mode to a new matrix...
+    madj = matrix(0, dim_i - nvertices_mode1, dim_j - nvertices_mode1)
+    for (i = nvertices_mode1 + 1; i < dim_i; i = i + 1) {
+        madj[i - nvertices_mode1, 0] = adj[i, 0]
+        madj[0, i - nvertices_mode1] = adj[i, 0]
+    }
+    for (i = nvertices_mode1 + 1; i < dim_i; i = i + 1) {
+        for (j = nvertices_mode1 + 1; j < dim_j; j = j + 1) {
+            madj[i - nvertices_mode1, j - nvertices_mode1] = adj[i, j]
+        }
+    }
+    adj = madj
+    madj = NULL
+}
+
+# Save the modified network file.
+if (output_file != "noname") {
+   CNA_SaveFile(output_file, adj, output_file_type)
+}
+

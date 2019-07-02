@@ -1,0 +1,147 @@
+#!/usr/local/bin/guash
+#
+# csvinterleave.gua
+#
+#     This script interleaves 3 CSV files.
+#
+# Copyright (C) 2015 Roberto Luiz Souza Monteiro
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: csvinterleave.gua,v 1.0 2015/11/27 14:42:00 monteiro Exp $
+#
+
+#
+# Configuration variables.
+#
+file_name_1 = "noname1"
+file_name_2 = "noname2"
+file_name_3 = "noname3"
+column_file_1 = 0
+column_file_2 = 0
+column_file_3 = 0
+output_file = "output.csv"
+separator = ","
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: csvinterleave option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: csvavg option1 value1 [option1 value1]")
+        println("-h    --help         show the options sumary")
+        println("-o                   output file")
+        println("      --f1           file 1")
+        println("      --f2           file 2")
+        println("      --f3           file 3")
+        println("      --c1           the column of file 1")
+        println("      --c2           the column of file 2")
+        println("      --c3           the column of file 3")
+        println("      --separator    column separator(default=\",\")")
+        
+        exit(0)
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "--f1") {
+        i = i + 1
+        file_name_1 = argv[i]
+    } elseif (argv[i] == "--f2") {
+        i = i + 1
+        file_name_2 = argv[i]
+    } elseif (argv[i] == "--f3") {
+        i = i + 1
+        file_name_3 = argv[i]
+    } elseif (argv[i] == "--c1") {
+        i = i + 1
+        column_file_1 = eval(argv[i])
+    } elseif (argv[i] == "--c2") {
+        i = i + 1
+        column_file_2 = eval(argv[i])
+    } elseif (argv[i] == "--c3") {
+        i = i + 1
+        column_file_3 = eval(argv[i])
+    } elseif (argv[i] == "--separator") {
+        i = i + 1
+        separator = argv[i]
+    }
+    i = i + 1
+} 
+
+# Get the current time...
+t1 = time();
+
+println("Processing files...\n")
+
+# Start file processing...
+f1 = fopen(file_name_1, "r")
+f2 = fopen(file_name_2, "r")
+f3 = fopen(file_name_3, "r")
+fo = fopen(output_file, "w")
+
+while (!feof(f1)) {
+    # Read a line from file 1...
+    if ((line1 = fgets(f1)) == NULL) {
+        break
+    }
+    if (separator != " ") {
+        record1 = split(trim(line1, " \t\n"), separator)
+    } else {
+        record1 = split(trim(line1, " \t\n"))
+    }
+    
+    # Read a line from file 2...
+    if ((line2 = fgets(f2)) == NULL) {
+        break
+    }
+    if (separator != " ") {
+        record2 = split(trim(line2, " \t\n"), separator)
+    } else {
+        record2 = split(trim(line2, " \t\n"))
+    }
+    
+    # Read a line from file 3...
+    if ((line3 = fgets(f3)) == NULL) {
+        break
+    }
+    if (separator != " ") {
+        record3 = split(trim(line3, " \t\n"), separator)
+    } else {
+        record3 = split(trim(line3, " \t\n"))
+    }
+    
+    output_line = record1[column_file_1] + "\t" + record2[column_file_2] + "\t" + record3[column_file_3] + "\n"
+
+    fputs(output_line, fo)
+}
+
+fclose(f1)
+fclose(f2)
+fclose(f3)
+fclose(fo)
+
+# Get the current time...
+t2 = time();
+
+# Show the elapsed time...
+printf("Elapsed time to process all files: %.3f seconds\n\n", t2 - t1)
+

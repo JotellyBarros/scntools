@@ -1,0 +1,346 @@
+#!/usr/local/bin/guash
+#
+# calcfract.gua
+#
+#     This script calculates the fractal dimension of a PBM file.
+#
+# Copyright (C) 2012 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: calcfract.gua,v 1.0 2012/11/28 09:48:00 monteiro Exp $
+#
+
+function CNA_LoadPBM(file_name) {
+    fp = fopen(file_name, "r")
+
+    image_type = "none"
+    image_size = "none"
+    
+    y = 0
+    
+    while (!feof(fp)) {
+        if((line = fgets(fp)) == NULL) { 
+            break
+        }
+
+        if (image_type == "none") {
+            image_type = trim(line, " \t\r\n")
+            if (image_type == "P1") {
+                continue
+            } else {
+                return(NULL)
+            }
+        }
+        
+        if (image_size == "none") {
+            image_size = split(trim(line, " \t\r\n"))
+            dim_y = eval(image_size[0])
+            dim_x = eval(image_size[1])
+            if (length(image_size) == 2) {
+                pixmap = matrix(0, dim_y, dim_x)
+                continue
+            } else {
+                return(NULL)
+            }
+        }
+        
+        image_line = split(trim(line, " \t\r\n"))
+        
+        foreach (image_line; x; color) {
+            if (length(color) > 0) {
+                pixmap[y, x] = eval(color)
+            }
+        }
+        
+        if (y < (dim_y - 1)) {
+            y = y + 1
+        } else {
+            break
+        }
+    }
+    
+    fp = fclose(fp)
+    
+    return(pixmap)
+}
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+report_file = "noname"
+csv_file = "noname"
+log_file = "noname"
+prefix = "sample"
+nfiles = 1
+index_from = 1
+index_to = 1
+index_in = 1
+max_size = 0
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: calcfract option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: calcfract option1 value1 [option1 value1]")
+        println("-h    --help      show the options sumary")
+        println("-i                input file")
+        println("-r                report file")
+        println("-c                CSV file")
+        println("-l                log file")
+        println("      --prefix    prefix for multiple file calculation(default=\"sample\")")
+        println("      --nfiles    number of files for multiple file calculation")
+        println("      --from      first file index for multiple file calculation")
+        println("      --to        last file index for multiple file calculation")
+        println("      --in        total number of files in the file set")
+        println("      --size      max box size (s x s)")
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-r") {
+        i = i + 1
+        report_file = argv[i]
+    } elseif (argv[i] == "-c") {
+        i = i + 1
+        csv_file = argv[i]
+    } elseif (argv[i] == "-l") {
+        i = i + 1
+        log_file = argv[i]
+    } elseif (argv[i] == "--prefix") {
+        i = i + 1
+        prefix = argv[i]
+    } elseif (argv[i] == "--nfiles") {
+        i = i + 1
+        nfiles = eval(argv[i])
+    } elseif (argv[i] == "--from") {
+        i = i + 1
+        index_from = eval(argv[i])
+    } elseif (argv[i] == "--to") {
+        i = i + 1
+        index_to = eval(argv[i])
+    } elseif (argv[i] == "--in") {
+        i = i + 1
+        index_in = eval(argv[i])
+    } elseif (argv[i] == "--size") {
+        i = i + 1
+        max_size = eval(argv[i])
+    }
+    i = i + 1
+} 
+
+# Get the current time...
+t1 = time();
+
+# Create the log file...
+if (csv_file != "noname") {
+    fc = fopen(csv_file, "w")
+}
+if (log_file != "noname") {
+    fl = fopen(log_file, "w")
+}
+
+# Calculate the file index number range...
+if (index_from < 1) {
+    index_from = 1
+}
+if (index_to <= 1) {
+    if (nfiles > 1) {
+        index_to = index_from + nfiles - 1
+    }
+}
+nfiles = index_to - index_from + 1
+if (index_in <= 1) {
+    index_in = nfiles
+}
+
+if (csv_file != "noname") {
+    fputs(sprintf("%s\t%s\n", "D", "R^2"), fc)
+}
+
+println("Processing " + nfiles + " files...\n")
+
+# Start file creation...
+for (nf = index_from; nf <= index_to; nf = nf + 1) {
+    # Get the current time...
+    ts1 = time();
+    
+    if (nfiles > 1) {
+        input_file = prefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", nf) + ".pbm"
+    }
+    
+    # Load the network file...
+    println("Loading file " + input_file + "...")
+    
+    pixmap = CNA_LoadPBM(input_file)
+    
+    if (nfiles > 1) {
+        report_file = prefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", nf) + ".rep"
+    }
+    
+    if (report_file != "noname") {
+        fr = fopen(report_file, "w")
+        fputs("BOX COUNTING\n\n", fr)
+        fputs(sprintf("%s\t%s\n", "BS", "BC"), fr)
+    }
+    
+    dim_pixmap = dim(pixmap)
+    dim_i = dim_pixmap[0]
+    dim_j = dim_pixmap[1]
+    
+    # Set the max box size...
+    if (max_size > 0) {
+        dim_i = max_size
+        dim_j = max_size
+    }
+    
+    # Box counting...
+    println("Calculating the box counting...")
+    
+    box_size = dim_i
+    n_boxes = 1
+    
+    while (box_size > 0) {
+        box_counting = 0
+        for (box_i = 0; box_i < n_boxes; box_i = box_i + 1) {
+            for (box_j = 0; box_j < n_boxes; box_j = box_j + 1) {
+                filled_boxes = count(pixmap, box_i * box_size, box_j * box_size, box_i * box_size + box_size - 1, box_j * box_size + box_size - 1)
+                if (filled_boxes > 0) {
+                    box_counting = box_counting + 1
+                }
+            }
+        }
+        boxes[box_size] = box_counting
+        box_size = roundl(box_size / 2)
+        if (box_size > 0) {
+            n_boxes = dim_i / box_size
+        }
+    }
+    
+    # Calculate the fractal dimension...
+    log_log = matrix(0.0, length(boxes), 2)
+    
+    i = 0
+    
+    foreach (boxes; box_size; box_counting) {
+        log_log[i, 0] = log10(box_size)
+        log_log[i, 1] = log10(box_counting)
+        
+        i = i + 1
+    }
+    
+    x = 0.0
+    y = 0.0
+    sx = 0.0
+    sy = 0.0
+    sxy = 0.0
+    sx2 = 0.0
+    sy2 = 0.0
+    a = 0.0
+    b = 0.0
+    n = 0.0
+    
+    for (i = 0; i < length(boxes); i = i + 1) {
+        n = n + 1
+        
+        x = log_log[i, 0]
+        y = log_log[i, 1]
+        
+        sx = sx + x
+        sy = sy + y
+        
+        sxy = sxy + x * y
+        sx2 = sx2 + x * x
+        sy2 = sy2 + y * y
+    }
+    
+    if (exists("boxes")) {
+        foreach (boxes; box_size; box_counting) {
+            # Report the box counting...
+            if (report_file != "noname") {
+                fputs(sprintf("%d\t%d\n", box_size, box_counting), fr)
+            }
+        }
+    }
+    
+    a = (sx * sy - n * sxy) / (sx * sx - n * sx2)
+    b = (sy - a * sx) / n
+    s = ((sxy - sx * (sy / n)) ** 2) / ((sx2 - (sx * sx) / n) * (sy2 - (sy * sy) / n))
+    
+    if (report_file != "noname") {
+        fputs(sprintf("\nComputation:\n"), fr)
+        fputs(sprintf("y     = a*x + b\n"), fr)
+        fputs(sprintf("a     = (sx * sy - n * sxy) / (sx * sx - n * sx2)\n"), fr)
+        fputs(sprintf("b     = (sy - a * sx) / n\n"), fr)
+        fputs(sprintf("R^2   = ((sxy - sx * (sy / n)) ** 2) / ((sx2 - (sx * sx) / n) * (sy2 - (sy * sy) / n))\n\n"), fr)
+        fputs(sprintf("sx    = %.50g\n", sx), fr)
+        fputs(sprintf("sy    = %.50g\n", sy), fr)
+        fputs(sprintf("sxy   = %.50g\n", sxy), fr)
+        fputs(sprintf("sx*sx = %.50g\n", sx*sx), fr)
+        fputs(sprintf("sx2   = %.50g\n", sx2), fr)
+        fputs(sprintf("sy2   = %.50g\n", sy2), fr)
+        fputs(sprintf("n     = %.50g\n", n), fr)
+        
+        fputs(sprintf("\nResult:\n"), fr)
+        fputs(sprintf("a     = %.10g\n", a), fr)
+        fputs(sprintf("b     = %.10g\n", b), fr)
+        fputs(sprintf("R^2   = %.10g\n", s), fr)
+        
+        fputs(sprintf("\nFractal dimension:\n"), fr)
+        fputs(sprintf("D     = %.10g\n", fabs(a)), fr)
+    }
+    
+    # Store the fractal dimension...
+    if (csv_file != "noname") {
+        fputs(sprintf("%f\t%f\n", fabs(a), s), fc)
+    }
+    
+    # Get the current time...
+    ts2 = time();
+    
+    # Show the elapsed time...
+    printf("Elapsed time to generate this file: %.3f seconds\n\n", ts2 - ts1)
+    
+    # Log the elapsed time...
+    if (log_file != "noname") {
+        fputs(sprintf("%d\t%.3f\n", nf, ts2 - ts1), fl)
+    }
+}
+
+# Close the CSV file...
+if (csv_file != "noname") {
+    fclose(fc)
+}
+
+# Close the log file...
+if (log_file != "noname") {
+    fclose(fl)
+}
+
+# Get the current time...
+t2 = time();
+
+# Show the elapsed time...
+printf("Elapsed time to generate %d files: %.3f seconds\n\n", nfiles, t2 - t1)
+

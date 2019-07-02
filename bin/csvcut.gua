@@ -1,0 +1,271 @@
+#!/usr/local/bin/guash
+#
+# csvcut.gua
+#
+#     This script cuts a CSV file.
+#
+# Copyright (C) 2011 Roberto Luiz Souza Monteiro.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+#
+# RCS: @(#) $Id: csvcut.gua,v 1.0 2014/08/29 03:19:00 monteiro Exp $
+#
+
+#
+# Configuration variables.
+#
+input_file = "noname"
+output_file = "noname"
+auxiliary_file = "noname"
+log_file = "noname"
+prefix = "sample"
+output_prefix = "sample"
+sufix = ""
+nfiles = 1
+index_from = 1
+index_to = 1
+index_in = 1
+separator = ","
+first_line = 0
+last_line = -1
+nlines = -1
+skipfirst = FALSE
+column_number = 0
+
+#
+# Main program.
+#
+if (argc < 3) {
+    println("Usage: csvcut option1 value1 [option1 value1]")
+    exit
+}
+
+i = 2
+
+while (i < argc) {
+    if ((argv[i] == "-h") || (argv[i] == "--help")) {
+        println("Usage: csvcut option1 value1 [option1 value1]")
+        println("-h    --help         show the options sumary")
+        println("-i                   input file")
+        println("-o                   output file")
+        println("-f                   auxiliary file containing the file sizes")
+        println("-l                   log file")
+        println("      --prefix       prefix for multiple file creation(default=\"sample\")")
+        println("      --sufix        sufix for multiple file creation(default=\"\")")
+        println("      --oprefix      output prefix for multiple file creation(default=\"sample\")")
+        println("      --nfiles       number of files for multiple file creation")
+        println("      --from         first file index for multiple file creation")
+        println("      --to           last file index for multiple file creation")
+        println("      --in           total number of files in the file set")
+        println("      --separator    column separator(default=\",\")")
+        println("      --first        first line to read(default=0)")
+        println("      --last         last line to read")
+        println("      --skipfirst    skip the first line in the auxiliary file")
+        println("      --col          column containing the file sizes(default=0)")
+        
+        exit(0)
+    } elseif (argv[i] == "-i") {
+        i = i + 1
+        input_file = argv[i]
+    } elseif (argv[i] == "-o") {
+        i = i + 1
+        output_file = argv[i]
+    } elseif (argv[i] == "-f") {
+        i = i + 1
+        auxiliary_file = argv[i]
+    } elseif (argv[i] == "-l") {
+        i = i + 1
+        log_file = argv[i]
+    } elseif (argv[i] == "--prefix") {
+        i = i + 1
+        prefix = argv[i]
+    } elseif (argv[i] == "--oprefix") {
+        i = i + 1
+        output_prefix = argv[i]
+    } elseif (argv[i] == "--sufix") {
+        i = i + 1
+        sufix = argv[i]
+    } elseif (argv[i] == "--nfiles") {
+        i = i + 1
+        nfiles = eval(argv[i])
+    } elseif (argv[i] == "--from") {
+        i = i + 1
+        index_from = eval(argv[i])
+    } elseif (argv[i] == "--to") {
+        i = i + 1
+        index_to = eval(argv[i])
+    } elseif (argv[i] == "--in") {
+        i = i + 1
+        index_in = eval(argv[i])
+    } elseif (argv[i] == "--separator") {
+        i = i + 1
+        separator = argv[i]
+    } elseif (argv[i] == "--first") {
+        i = i + 1
+        first_line = eval(argv[i])
+    } elseif (argv[i] == "--last") {
+        i = i + 1
+        last_line = eval(argv[i])
+    } elseif (argv[i] == "--skipfirst") {
+        skipfirst = TRUE
+    } elseif (argv[i] == "--col") {
+        i = i + 1
+        column_number = eval(argv[i])
+    }
+    i = i + 1
+}
+
+# Get the current time...
+t1 = time();
+
+# Open the auxiliary file containing the file sizes...
+if (auxiliary_file == "noname") {
+    println("Error: auxiliary file name is mandatory.")
+    exit(1)
+}
+
+# Create the log file...
+if (log_file != "noname") {
+    fl = fopen(log_file, "w")
+}
+
+# Calculate the file index number range...
+if (index_from < 1) {
+    index_from = 1
+}
+if (index_to <= 1) {
+    if (nfiles > 1) {
+        index_to = index_from + nfiles - 1
+    }
+}
+nfiles = index_to - index_from + 1
+if (index_in <= 1) {
+    index_in = nfiles
+}
+
+# Calculate the line number range...
+if (first_line < 0) {
+    first_line = 0
+}
+if (last_line < 0) {
+    if (nlines > 1) {
+        last = first_line + nlines - 1
+    }
+}
+if (last_line > -1) {
+    nlines = last_line - first_line + 1
+}
+
+# Read the files sizes...
+nf = index_from
+
+fa = fopen(auxiliary_file, "r")
+ln = -1
+while (!feof(fa)) {
+    if ((line = fgets(fa)) == NULL) {
+        break
+    }
+    
+    ln = ln + 1
+    
+    if ((ln == 0) && (skipfirst == TRUE)) {
+        continue
+    }
+    
+    if (separator != " ") {
+        record = split(trim(line, " \t\n"), separator)
+    } else {
+        record = split(trim(line, " \t\n"))
+    }
+    
+    file_size[nf] = eval(record[column_number])
+    
+    nf = nf + 1
+}
+fa = fclose(fa)
+
+println("Processing " + nfiles + " files...\n")
+
+# Start file processing...
+for (nf = index_from; nf <= index_to; nf = nf + 1) {
+    # Get the current time...
+    ts1 = time();
+    
+    if (nfiles > 1) {
+        input_file = prefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", nf) + sufix + ".csv"
+        output_file = output_prefix + "-" + sprintf("%0" + length(toString(index_in)) + "." + length(toString(index_in)) + "d", nf) + sufix + ".csv"
+    }
+    
+    println("Processing file " + input_file + "...")
+    
+    fp = fopen(input_file, "r")
+    fo = fopen(output_file, "w")
+    
+    row = 0
+    
+    while (!feof(fp)) {
+        if ((line = fgets(fp)) == NULL) {
+            break
+        }
+        
+        if (separator != " ") {
+            record = split(trim(line, " \t\n"), separator)
+        } else {
+            record = split(trim(line, " \t\n"))
+        }
+        
+        if (row >= first_line) {
+            if (nlines >= 1) {
+                if (row < nlines) {
+                    fputs(line, fo)
+                }
+            } else {
+                fputs(line, fo)
+            }
+        }
+        
+        row = row + 1
+        
+        if (row >= file_size[nf]) {
+            break
+        }
+    }
+    
+    fp = fclose(fp)
+    fo = fclose(fo)
+    
+    # Get the current time...
+    ts2 = time();
+    
+    # Show the elapsed time...
+    printf("Elapsed time to process this file: %.3f seconds\n\n", ts2 - ts1)
+    
+    # Log the elapsed time...
+    if (log_file != "noname") {
+        fputs(sprintf("%d\t%.3f\n", nf, ts2 - ts1), fl)
+    }
+}
+
+# Close the log file...
+if (log_file != "noname") {
+    fclose(fl)
+}
+
+# Get the current time...
+t2 = time();
+
+# Show the elapsed time...
+printf("Elapsed time to process %d files: %.3f seconds\n\n", nfiles, t2 - t1)
+
