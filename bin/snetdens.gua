@@ -20,7 +20,7 @@
 # along with this program; if not, write to the Free Soflware
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
-# RCS: @(#) $Id: snetdens.gua,v 1.2 2014/01/21 17:30:00 monteiro Exp $
+# RCS: @(#) $Id: snetdens.gua,v 2.0 2019/07/15 10:10:00 monteiro Exp $
 #
 
 function CNA_SaveFile(filename, adj, type = "edges") {
@@ -88,6 +88,7 @@ output_file_type = "edges"
 report_file = "output.rep"
 log_file = "output.log"
 log_all = FALSE
+use_weights = FALSE
 mode = "clique"
 worder = FALSE
 rgrow = TRUE
@@ -123,6 +124,7 @@ while (i < argc) {
         println("-r                    report file")
         println("-l                    log file")
         println("-a                    log all")
+        println("-w                    use weights to indicate number of occurrences of pairs of words")
         println("      --mode          sentence insertion mode(default=clique),")
         println("                      options=clique|cicle|chain")
         println("      --worder        use weights to indicate reading order")
@@ -159,6 +161,8 @@ while (i < argc) {
         log_file = argv[i]
     } elseif (argv[i] == "-a") {
         log_all = TRUE
+    } elseif (argv[i] == "-w") {
+        use_weights = TRUE
     } elseif (argv[i] == "--mode") {
         i = i + 1
         mode = argv[i]
@@ -515,7 +519,11 @@ while (!feof(fp)) {
                 foreach (v; w1; i) {
                     foreach (v; w2; j) {
                         if (w1 != w2) {
-                            edges[i, j] = 1
+                            if (use_weights) {
+                                edges[i, j] = edges[i, j] + 1
+                            } else {
+                                edges[i, j] = 1
+                            }
                         }
                     }
                 }
@@ -538,7 +546,11 @@ while (!feof(fp)) {
                             wo = wo + 1
                             edges[i, j] = wo
                         } else {
-                            edges[i, j] = 1
+                            if (use_weights) {
+                                edges[i, j] = edges[i, j] + 1
+                            } else {
+                                edges[i, j] = 1
+                            }
                         }
                     }
                     previous = w1
@@ -570,7 +582,11 @@ while (!feof(fp)) {
                             wo = wo + 1
                             edges[i, j] = wo
                         } else {
-                            edges[i, j] = 1
+                            if (use_weights) {
+                                edges[i, j] = edges[i, j] + 1
+                            } else {
+                                edges[i, j] = 1
+                            }
                         }
                     }
                     previous = w1
