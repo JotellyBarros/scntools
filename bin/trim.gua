@@ -1,8 +1,8 @@
 #!/usr/local/bin/guash
 #
-# mp2b2netcsv.gua
+# trim.gua
 #
-#     This script creates a NetCSV file.
+#     This script removes trelling space from a line and save each line in another file .
 #
 # Copyright (C) 2019 Roberto Luiz Souza Monteiro; Hernane Borges de Barros Pereira
 #
@@ -20,14 +20,14 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
-# RCS: @(#) $Id: mp2b2netcsv.gua,v 1.0 2019/08/13 14:41:00 monteiro Exp $
+# RCS: @(#) $Id: trim.gua,v 1.0 2019/10/01 14:58:00 monteiro Exp $
 #
 
 #
 # Configuration variables.
 #
 input_file = "noname"
-output_file = "output.net"
+output_file = "output"
 separator = ";"
 
 
@@ -35,7 +35,7 @@ separator = ";"
 # Main program.
 #
 if (argc < 3) {
-    println("Usage: mp2b2netcsv option1 value1 [option1 value1]")
+    println("Usage: trim option1 value1 [option1 value1]")
     exit
 }
 
@@ -43,11 +43,10 @@ i = 2
 
 while (i < argc) {
     if ((argv[i] == "-h") || (argv[i] == "--help")) {
-        println("Usage: mp2b2netcsv option1 value1 [option1 value1]")
+        println("Usage: trim option1 value1 [option1 value1]")
         println("-h    --help         show the options sumary")
         println("-i                   input file")
         println("-o                   output file")
-        println("      --separator    column separator(default=\";\")")
         exit(0)
     } elseif (argv[i] == "-i") {
         i = i + 1
@@ -55,9 +54,6 @@ while (i < argc) {
     } elseif (argv[i] == "-o") {
         i = i + 1
         output_file = argv[i]
-    } elseif (argv[i] == "--separator") {
-        i = i + 1
-        separator = argv[i]
     }
     i = i + 1
 } 
@@ -79,18 +75,11 @@ while (!feof(fi)) {
         break
     }
 
-    record = split(trim(line, " \t\r\n"), separator)
+    record = trim(line, " \t\r\n")
     
-    column1 = record[0]
-    column2 = record[1]
-
-    if (length(column1) != 0) {
-        column_source = column2
-        
-        continue
+    if (length(record) != 0) {
+        fputs(record + "\n", fo)
     }
-    
-    fputs(column_source + separator + column2 + "\n", fo)
 }
 
 

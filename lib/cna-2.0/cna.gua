@@ -336,10 +336,12 @@ function cnaShortestPath(adj) {
     dim_i = dim_adj[0]
     dim_j = dim_adj[1]
 
+    # This two matrices are for stop decision.
     matrix_one = one(dim_i, dim_j)
     matrix_zero = zero(dim_i, dim_j)
     
-    # Remove vertex data from the matrix.
+    # Remove vertex data from the matrix, to avoid multiplication errors,
+    # because labels are strings.
     for (i = 0; i < dim_i; i = i + 1) {
         adj[0, i] = 0
         adj[i, 0] = 0
@@ -347,8 +349,10 @@ function cnaShortestPath(adj) {
         matrix_one[i, 0] = 0
     }
     
+    # In order to preserve the original matrix, clone it.
     geodesic = adj
     
+    # Stop if there  is no path, or every node is connected one each other.
     if ((adj == matrix_zero) || (adj == matrix_one)) {
         return(geodesic)
     }
@@ -357,18 +361,23 @@ function cnaShortestPath(adj) {
     order = 1
     
     while (TRUE) {
+        # Performe a logical multiplication.
         prod = adj &| old
+        # Preserve previous multiplication, if it became zero.
         path = old || prod
         order = order + 1
         
         for (i = 1; i < dim_i; i = i + 1) {
             for (j = 1; j < dim_j; j = j + 1) {
+                # Update path length.
                 if ((prod[i, j] == 1) && (geodesic[i, j] == 0) && (i != j)) {
                     geodesic[i, j] = order
                 }
             }
         }
         
+        # Stop is result is matrix one, zero, or the path length reached
+        # the matrix size (maximum path length).
         if (path == matrix_one) {
             break
         } elseif (path == old) {
@@ -380,6 +389,7 @@ function cnaShortestPath(adj) {
         old = prod
     }
 
+    # Return path lengths.
     return(geodesic)
 }
 

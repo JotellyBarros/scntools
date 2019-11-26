@@ -93,6 +93,7 @@ modes = 1
 separator = ","
 ignore = "NULL"
 addsufix = FALSE
+noquotas = FALSE
 
 
 #
@@ -115,6 +116,7 @@ while (i < argc) {
         println("      --separator    column separator(default=\",\")")
         println("      --ignore       ignore fields with the specified patern(default=NULL)")
         println("      --addsufix     add a mode sufix to each vertex")
+        println("      --noquotas     strings are not enclosured between quotas")
         exit(0)
     } elseif (argv[i] == "-i") {
         i = i + 1
@@ -133,6 +135,8 @@ while (i < argc) {
         ignore = argv[i]
     } elseif (argv[i] == "--addsufix") {
         addsufix = TRUE
+    } elseif (argv[i] == "--noquotas") {
+        noquotas = TRUE
     }
     i = i + 1
 } 
@@ -157,14 +161,23 @@ if (modes == 2) {
 
         record = split(trim(line, " \t\n"), separator)
 
-        if (addsufix) {
-            column1 = eval(record[0]) + "_M1"
-            column2 = eval(record[1]) + "_M2"
+        if (noquotas) {
+            if (addsufix) {
+                column1 = record[0] + "_M1"
+                column2 = record[1] + "_M2"
+            } else {
+                column1 = "" + record[0]
+                column2 = "" + record[1]
+            }
         } else {
-            column1 = "" + eval(record[0])
-            column2 = "" + eval(record[1])
+            if (addsufix) {
+                column1 = eval(record[0]) + "_M1"
+                column2 = eval(record[1]) + "_M2"
+            } else {
+                column1 = "" + eval(record[0])
+                column2 = "" + eval(record[1])
+            }
         }
-        
         try {
             if (search(keys(mode1), column1) == NULL) {
                 n1 = n1 + 1
@@ -210,9 +223,13 @@ if (modes == 2) {
 
         record = split(trim(line, " \t\n"), separator)
         
-        column1 = eval(record[0])
-        column2 = eval(record[1])
-
+        if (noquotas) {
+            column1 = record[0]
+            column2 = record[1]
+        } else {
+            column1 = eval(record[0])
+            column2 = eval(record[1])
+        }
         try {
             if (search(keys(vertex), column1) == NULL) {
                 n1 = n1 + 1
