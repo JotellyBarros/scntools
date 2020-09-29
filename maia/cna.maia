@@ -406,9 +406,6 @@ namespace cna {
         prod = adj.slice()
         order = 1
         while (true) {
-            system.println(JSON.stringify(adj))
-            system.println(JSON.stringify(old))
-            
             prod = this.getTransitiveClosure(adj, old)
             path = this.getBooleanOr(old, prod)
             order = order + 1      
@@ -448,6 +445,183 @@ namespace cna {
             avgshortestpath = 0
         }
         return(avgshortestpath)
+    }
+    
+    ##
+    # Calculates the network diameter.
+    # @method getDiameter
+    # @param {object}   geodesic - Array the shortest parh between each two vetices in the matrix.
+    # @return {number}  Returns the network diameter.
+    #
+    function getDiameter(geodesic) {
+        diameter = matrix.max(geodesic)
+        return(diameter)
+    }
+    
+    ##
+    # Calculates the shortest parh between each two vetices in the matrix using Floyd Warshall method.
+    # @method getFloydWarshallShortestPath
+    # @param {object}   adj - Adjascence matrix.
+    # @param {object}   path - Matrix to store paths.
+    # @return {object}  Returns an array containing the shortest parh between each two vetice in the matrix.
+    #
+    function getFloydWarshallShortestPath(adj, path) {
+        dimAdj = core.dim(adj)
+        dimI = dimAdj[0]
+        dimJ = dimAdj[1]
+        geodesic = adj
+        if (core.type(path) == "undefined") {
+            path = core.matrix(-1, dimI, dimJ)
+        }
+        for (i = 1; i < dimI; i = i + 1) {
+            for (j = 1; j < dimJ; j = j + 1) {
+                for (k = 1; k < dimI; k = k + 1) {
+                    if (geodesic[j, k] == 0) {
+                        geodesic[j, k] = 999999999
+                    }
+                    if (geodesic[j, i] == 0) {
+                        geodesic[j, i] = 999999999
+                    }
+                    if (geodesic[i, k] == 0) {
+                        geodesic[i, k] = 999999999
+                    }
+                    if ((geodesic[j, i] + geodesic[i, k]) < geodesic[j, k]) {
+                        geodesic[j, k] = geodesic[j, i] + geodesic[i, k]
+                        path[j, k] = i
+                    }
+                }
+            }
+        }
+        for (i = 0; i < dimI; i = i + 1) {
+            geodesic[0, i] = 0
+            geodesic[i, 0] = 0
+            geodesic[i, i] = 0
+        }
+        // Fix geodesics.
+        for (i = 0; i < dimI; i = i + 1) {
+            for (j = 0; j < dimJ; j = j + 1) {
+                if (geodesic[i, j] == 999999999) {
+                    geodesic[i, j] = 0
+                }
+            }
+        }
+        return(geodesic)
+    }
+    
+    ##
+    # Do a shortest parh walk in the network and returns the path.
+    # @method doShortestPathWalk
+    # @param {object}   geodesic - Geodesics matrix.
+    # @param {object}   path - Paths matrix.
+    # @param {number}   j - Element index.
+    # @param {number}   k - Element index.
+    # @return {object}  Returns an array containing the shortest parh walk between two vetice in the matrix.
+    #
+    function doShortestPathWalk(geodesic, path, j, k) {
+        system.println(geodesic[j, k])
+        
+        if (geodesic[j, k] == 0) {
+            return([])
+        }
+        i = path[j, k]
+        if (i == -1) {
+            return([])
+        } else {
+            pji = this.doShortestPathWalk(geodesic, path, j, i)
+            pik = this.doShortestPathWalk(geodesic, path, i, k)
+            pjk = []
+            if (core.length(pji) != 0) {
+                pjk.push(pji)
+            }
+            pjk.push(i)
+            if (core.length(pik) != 0) {
+                pjk.push(pik)
+            }
+            return(pjk)
+        }
+    }
+    
+    ##
+    # Return the number os geodesics in the network.
+    # @method getNumberOfGeodesics
+    # @param {object}   adj - Adjascence matrix.
+    # @param {object}   geodesic - Vector including the geodesics of the network.
+    # @param {boolean}  directed - True if the network is directed. False otherwise.
+    # @return {number}  Returns the number os geodesics in the network.
+    #
+    function getNumberOfGeodesics(adj, geodesic, directed) {
+        dimGeodesic = core.dim(geodesic)
+        dimI = dimGeodesic[0]
+        dimJ = dimGeodesic[1]
+        gjk = adj.slice()
+        for (i = 0; i < dimI; i = i + 1) {
+            gjk[0, i] = 0
+            gjk[i, 0] = 0
+            gjk[i, i] = 1
+        }
+        diameter = this.getDiameter(geodesic)
+        // Count how many geodesics are there between vertices i and j.
+        for (p = 2; p <= diameter; p = p + 1) {
+            npaths = adj ^ p
+            for (i = 1; i < dimI; i = i + 1) {
+                for (j = 1; j < dimJ; j = j + 1) {
+                    if (i != j) {
+                        if (gjk[i, j] == 0) {
+                            gjk[i, j] = npaths[i, j]
+                        }
+                    }
+                }
+            }
+        }
+        return(gjk)
+    }
+    
+    ##
+    # Returns an array containing the centralities of each pair of the network's vertices.
+    # @method getCentrality
+    # @param {object}   adj - Adjascence matrix.
+    # @param {object}   geodesic - Vector including the geodesics of the network.
+    # @param {boolean}  directed - True if the network is directed. False otherwise.
+    # @return {object}  Returns an array containing the centralities of each pair of the network's vertices
+    #
+    function getCentrality(adj, geodesic, directed) {
+        dimGeodesic = core.dim(geodesic)
+        dimI = dimGeodesic[0]
+        dimJ = dimGeodesic[1]
+        // Column 0 contains the closeness centrality,
+        // Column 1 contains the betweenness centrality.
+        // Column 2 contains the normalized closeness centrality,
+        // Column 3 contains the normalized betweenness centrality.
+        centrality = core.matrix(0, dimI, 5)
+        n = dimI - 1
+        // Calculate the closeness centrality for each vertex.
+        for (i = 1; i < dimI; i = i + 1) {
+            s = matrix.sum(geodesic, i, 1, i, dimJ - 1)
+            if (s > 0) {
+                centrality[i, 0] = 1 / s
+                centrality[i, 2] = (n - 1) / s
+                centrality[i, 4] = s
+            }
+        }
+        // Calculate the betweenness centrality for each vertex.
+        gjk = this.getNumberOfGeodesics(adj, geodesic, directed)
+        for (i = 1; i < dimI; i = i + 1) {
+            bc = 0
+            for (j = 1; j < dimI; j = j + 1) {
+                for (k = 1; k < dimJ; k = k + 1) {
+                    // Must insert an if to test if it is a directed graph.
+                    if ((j < k) && (j != i) && (i != k)) {
+                        spjk = geodesic[j, k]
+                        if ((geodesic[j, i] + geodesic[i, k]) == spjk) {
+                            bc = bc + math.max(gjk[j, i], gjk[i, k]) / gjk[j, k]
+                        }
+                    }
+                }
+            }
+            centrality[i, 1] = bc
+            centrality[i, 3] = (2 * bc) / (n ^ 2 - 3 * n + 2)
+        }
+        return(centrality)
     }
     
     ##
