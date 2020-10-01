@@ -518,8 +518,6 @@ namespace cna {
     # @return {object}  Returns an array containing the shortest parh walk between two vetice in the matrix.
     #
     function doShortestPathWalk(geodesic, path, j, k) {
-        system.println(geodesic[j, k])
-        
         if (geodesic[j, k] == 0) {
             return([])
         }
@@ -622,6 +620,69 @@ namespace cna {
             centrality[i, 3] = (2 * bc) / (n ^ 2 - 3 * n + 2)
         }
         return(centrality)
+    }
+    
+    ##
+    # Returns an array containing the vertex efficiency of each pair of the network's vertices.
+    # @method getVertexEfficiency
+    # @param {object}   geodesic - Vector including the geodesics of the network.
+    # @return {object}  Returns an array containing the vertex efficiency of each pair of the network's vertices
+    #
+    function getVertexEfficiency(geodesic) {
+        dimGeodesic = core.dim(geodesic)
+        dimI = dimGeodesic[0]
+        dimJ = dimGeodesic[1]
+        efficiency = core.matrix(0, dimI, dimJ)
+        for (i = 1; i < dimI; i = i + 1) {
+            for (j = 1; j < dimJ; j = j + 1) {
+                if (geodesic[i, j] != 0) {
+                    efficiency[i, j] = 1 / geodesic[i, j]
+                }
+            }
+        }
+        return(efficiency)
+    }
+    
+    ##
+    # Returns the network's global efficiency.
+    # @method getGlobalEfficiency
+    # @param {object}   efficiency - Array containing the vertex efficiency of each vertex of the network.
+    # @param {boolean}  directed - True if the network is directed. False otherwise.
+    # @return {number}  Returns the network's global efficiency.
+    #
+    function getGlobalEfficiency(efficiency, directed) {
+        if (core.type(directed) == "undefined") {
+            directed = false
+        }
+        dimEfficiency = core.dim(efficiency)
+        n = dimEfficiency[0] - 1
+        if (directed) {
+            avgeff = matrix.sum(efficiency) / (n * (n - 1))
+        } else {
+            avgeff = matrix.sum(efficiency) / (n * (n - 1)) / 2
+        }
+        return(avgeff)
+    }
+    
+    ##
+    # Returns the network's local efficiency.
+    # @method getLocalEfficiency
+    # @param {object}   subgraphEfficiency - An array containing network subgraphs efficiencies.
+    # @param {boolean}  directed - True if the network is directed. False otherwise.
+    # @return {number}  Returns the network's local efficiency.
+    #
+    function getLocalEfficiency(subgraphEfficiency, directed) {
+        if (core.type(directed) == "undefined") {
+            directed = false
+        }
+        dimSubgraphEfficiency = core.dim(subgraphEfficiency)
+        n = dimSubgraphEfficiency[0] - 1
+        if (directed) {
+            avgeff = matrix.sum(subgraphEfficiency) / (n * (n - 1))
+        } else {
+            avgeff = matrix.sum(subgraphEfficiency) / (n * (n - 1)) / 2
+        }
+        return(localEfficiency)
     }
     
     ##
