@@ -307,6 +307,7 @@ namespace cna {
         avgDeg = matrix.avg(degrees, 1, 2, (dimI - 1), 2)
         return(avgDeg)
     }
+    
     ##
     # Calculates the clustering coefficients of the vertices.
     # @method getClustering
@@ -665,23 +666,73 @@ namespace cna {
     }
     
     ##
-    # Returns the network's local efficiency.
-    # @method getLocalEfficiency
-    # @param {object}   subgraphEfficiency - An array containing network subgraphs efficiencies.
+    # Returns the network's subgraphs efficiencies.
+    # @method getSubgraphEfficiency
+    # @param {object}   adj - Adjascence matrix.
+    # @param {object}   efficiency - Array containing the vertex efficiency of each vertex of the network.
     # @param {boolean}  directed - True if the network is directed. False otherwise.
-    # @return {number}  Returns the network's local efficiency.
+    # @return {object}  Returns the network's subgraphs efficiencies.
     #
-    function getLocalEfficiency(subgraphEfficiency, directed) {
+    function getSubgraphEfficiency(adj, efficiency, directed) {
         if (core.type(directed) == "undefined") {
             directed = false
         }
+        dimAdj = core.dim(adj)
+        dimEfficiency = core.dim(efficiency)
+        dimI = dimAdj[0]
+        dimJ = dimAdj[1]
+        subgraphEfficiency = core.matrix(0, dimI, 1)
+        // Calculate the local efficiency for each vertex.
+        for (i = 1; i < dimI; i = i + 1) {
+            // Get all neighbor indexes.
+            neighbor = []
+            for (j = 1; j < dimJ; j = j + 1) {
+                if ((adj[i, j] == 1) || (adj[j, i] == 1)) {
+                    neighbor.push(j)
+                }
+            }
+            // Sum all neighbors efficiency.
+            if (core.length(neighbor) > 0) {
+                s = 0.0
+                for (n1 = 0; n1 < core.length(neighbor); n1 = n1 + 1) {
+                    for (n2 = 0; n2 < core.length(neighbor); n2 = n2 + 1) {
+                        if (n1 != n2) {
+                            if (adj[neighbor[n1], neighbor[n2]] == 1) {
+                                s = s + efficiency[n1, n2]
+                            }
+                        }
+                    }
+                }
+                n = core.length(neighbor)
+                // Calculate the local efficiency to this vertex.
+                if ((n == 0) || (n == 1)) {
+                    subgraphEfficiency[i, 0] = 0
+                } else {
+                    if (n == dimI - 1) {
+                        subgraphEfficiency[i, 0] = 1
+                    } else {
+                        if (directed) {
+                            subgraphEfficiency[i, 0] = s / (n * (n - 1))
+                        } else {
+                            subgraphEfficiency[i, 0] = s / (n * (n - 1)) / 2
+                        }
+                    }
+                }
+            }
+        }
+        return(subgraphEfficiency)
+    }
+    
+    ##
+    # Returns the network's local efficiency.
+    # @method getLocalEfficiency
+    # @param {object}   subgraphEfficiency - An array containing network subgraphs efficiencies.
+    # @return {number}  Returns the network's local efficiency.
+    #
+    function getLocalEfficiency(subgraphEfficiency, directed) {
         dimSubgraphEfficiency = core.dim(subgraphEfficiency)
         n = dimSubgraphEfficiency[0] - 1
-        if (directed) {
-            avgeff = matrix.sum(subgraphEfficiency) / (n * (n - 1))
-        } else {
-            avgeff = matrix.sum(subgraphEfficiency) / (n * (n - 1)) / 2
-        }
+        localEfficiency = matrix.sum(subgraphEfficiency) / (n * (n - 1))
         return(localEfficiency)
     }
     
