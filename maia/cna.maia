@@ -80,9 +80,15 @@ namespace cna {
     # Parses a Pajek file.
     # @method parsePajekFile
     # @param {string}   fileContents - Pajek file contents.
+    # @param {object}   properties - Network properties (n, m and directed).
     # @return {object}  An adjascence matrix.
     #
-    function parsePajekFile(fileContents) {
+    function parsePajekFile(fileContents, properties) {
+        properties.n = 0
+        properties.m = 0
+        properties.directed = false
+
+        adj = []
         fileSection = "none"
         fileLines = core.split(fileContents, "\r\n")
         for (l = 0; l < fileLines.length; l = l + 1) {
@@ -91,50 +97,240 @@ namespace cna {
             if ((core.toLowerCase(record[0]) == "*vertices") || (core.toLowerCase(record[0]) == "*edges") || (core.toLowerCase(record[0]) == "*arcs") || (core.toLowerCase(record[0]) == "*matrix")) {
                 fileSection = core.toLowerCase(record[0])
                 if (fileSection == "*vertices") {
-                    n = core.toNumber(record[1]) + 1
-                    adj = core.matrix(0, n, n)
+                    n = ""
+                    for (j = 1; j < record.length; j = j + 1) {
+                        if (record[j] == "") {
+                            continue
+                        }
+                        if (n == "") {
+                            n = core.toNumber(record[j])
+                            break
+                        }
+                    }
+                    if (n == "") {
+                        break
+                    } else {
+                        adj = core.matrix(0, n + 1, n + 1)
+                        properties.n = n
+                    }
+                } elseif (fileSection == "*arcs") {
+                    properties.directed = true
                 }
-                i = 0
                 continue
             }
             if (core.length(record) >= 2) {
                 if (fileSection == "*vertices") {
-                    adj[0, i + 1] = record[1]
-                    adj[i + 1, 0] = record[1]
-                    i = i + 1
-                } elseif (fileSection == "*edges") {
-                    i = core.toNumber(record[0])
-                    j = core.toNumber(record[1])
-                    if (core.length(record) == 2) {
-                        adj[i, j] = 1
-                        adj[j, i] = 1
-                    } else {
-                        adj[i, j] = core.toNumber(record[2])
-                        adj[j, i] = core.toNumber(record[2])
-                    }
-                } elseif (fileSection == "*arcs") {
-                    i = core.toNumber(record[0])
-                    j = core.toNumber(record[1])
-                    if (core.length(record) == 2) {
-                        adj[i, j] = 1
-                    } else {
-                        adj[i, j] = core.toNumber(record[2])
-                    }
-                } elseif (fileSection == "*matrix") {
+                    id = ""
+                    label = ""
                     for (j = 0; j < record.length; j = j + 1) {
-                        v = record[j]
-                        adj[i + 1, j + 1] = core.toNumber(v)
-                        if (i == n) {
-                            break
+                        if (record[j] == "") {
+                            continue
+                        }
+                        if (id == "") {
+                            id = core.toNumber(record[j])
+                            continue
+                        }
+                        if (label == "") {
+                            label = record[j]
+                            continue
                         }
                     }
+                    adj[0, id] = label
+                    adj[id, 0] = label
                     i = i + 1
+                } elseif (fileSection == "*edges") {
+                    source = ""
+                    target = ""
+                    weight = ""
+                    for (j = 0; j < record.length; j = j + 1) {
+                        if (record[j] == "") {
+                            continue
+                        }
+                        if (source == "") {
+                            source = core.toNumber(record[j])
+                            continue
+                        }
+                        if (target == "") {
+                            target = core.toNumber(record[j])
+                            continue
+                        }
+                        if (weight == "") {
+                            weight = core.toNumber(record[j])
+                            continue
+                        }
+                    }
+                    if (weight == "") {
+                        weight = 1
+                    }
+                    adj[source, target] = weight
+                    adj[target, source] = weight
+
+                    properties.m = properties.m + 1
+                } elseif (fileSection == "*arcs") {
+                    source = ""
+                    target = ""
+                    weight = ""
+                    for (j = 0; j < record.length; j = j + 1) {
+                        if (record[j] == "") {
+                            continue
+                        }
+                        if (source == "") {
+                            source = core.toNumber(record[j])
+                            continue
+                        }
+                        if (target == "") {
+                            target = core.toNumber(record[j])
+                            continue
+                        }
+                        if (weight == "") {
+                            weight = core.toNumber(record[j])
+                            continue
+                        }
+                    }
+                    if (weight == "") {
+                        weight = 1
+                    }
+                    adj[source, target] = weight
+
+                    properties.m = properties.m + 1
                 }
             }
         }
         return(adj)
     }
     
+    ##
+    # Convert a file in Pajek format to JSON.
+    # @method pajekFileToJson
+    # @param {string}   fileContents - Pajek file contents.
+    # @return {object}  A JSON containing the network..
+    #
+    function pajekFileToJson(fileContents) {
+        network = {
+            "nodes": [],
+            "edges": []
+        }
+        fileSection = "none"
+        fileLines = core.split(fileContents, "\r\n")
+        for (l = 0; l < fileLines.length; l = l + 1) {
+            line = fileLines[l]
+            record = core.split(line.trim(), " ")
+            if ((core.toLowerCase(record[0]) == "*vertices") || (core.toLowerCase(record[0]) == "*edges") || (core.toLowerCase(record[0]) == "*arcs") || (core.toLowerCase(record[0]) == "*matrix")) {
+                fileSection = core.toLowerCase(record[0])
+                i = 0
+                continue
+            }
+            if (core.length(record) >= 2) {
+                if (fileSection == "*vertices") {
+                    id = ""
+                    label = ""
+                    x = ""
+                    y = ""
+                    size = ""
+                    for (j = 0; j < record.length; j = j + 1) {
+                        if (record[j] == "") {
+                            continue
+                        }
+                        if (id == "") {
+                            id = core.toString(record[j])
+                            continue
+                        }
+                        if (label == "") {
+                            label = record[j]
+                            continue
+                        }
+                        if (x == "") {
+                            x = core.toNumber(record[j])
+                            continue
+                        }
+                        if (y == "") {
+                            y = core.toNumber(record[j])
+                            continue
+                        }
+                        if (size == "") {
+                            size = core.toNumber(record[j])
+                        }
+                    }
+                    if (x == "") {
+                        x = math.random()
+                    }
+                    if (y == "") {
+                        y = math.random()
+                    }
+                    if (size == "") {
+                        size = 1
+                    }
+                    node = {
+                        "id": "n" + id,
+                        "label": label,
+                        "x": x,
+                        "y": y,
+                        "size": size
+                    }
+                    network.nodes.push(node)
+                    i = i + 1
+                } elseif (fileSection == "*edges") {
+                    id = ""
+                    source = ""
+                    target = ""
+                    for (j = 0; j < record.length; j = j + 1) {
+                        if (record[j] == "") {
+                            continue
+                        }
+                        if (id == "") {
+                            id = core.toString(record[j])
+                            continue
+                        }
+                        if (source == "") {
+                            source = core.toNumber(record[j])
+                            continue
+                        }
+                        if (target == "") {
+                            target = core.toNumber(record[j])
+                            continue
+                        }
+                    }
+                    edge = {
+                        "id": "e" + core.toString(i),
+                        "source": "n" + core.toString(source),
+                        "target": "n" + core.toString(target)
+                    }
+                    network.edges.push(edge)
+                    i = i + 1
+                } elseif (fileSection == "*arcs") {
+                    id = ""
+                    source = ""
+                    target = ""
+                    for (j = 0; j < record.length; j = j + 1) {
+                        if (record[j] == "") {
+                            continue
+                        }
+                        if (id == "") {
+                            id = core.toString(record[j])
+                            continue
+                        }
+                        if (source == "") {
+                            source = core.toNumber(record[j])
+                            continue
+                        }
+                        if (target == "") {
+                            target = core.toNumber(record[j])
+                            continue
+                        }
+                    }
+                    edge = {
+                        "id": "e" + core.toString(i),
+                        "source": "n" + core.toString(source),
+                        "target": "n" + core.toString(target)
+                    }
+                    network.edges.push(edge)
+                    i = i + 1
+                }
+            }
+        }
+        return(network)
+    }
+
     ##
     # Transitive closure between two matrices (A and B).
     # @method getTransitiveClosure
@@ -305,7 +501,7 @@ namespace cna {
         dimDegrees = core.dim(degrees)
         dimI = dimDegrees[0]
         avgDeg = matrix.avg(degrees, 1, 2, (dimI - 1), 2)
-        return(avgDeg)
+        return(avgDeg.avg)
     }
     
     ##
@@ -648,20 +844,12 @@ namespace cna {
     # Returns the network's global efficiency.
     # @method getGlobalEfficiency
     # @param {object}   efficiency - Array containing the vertex efficiency of each vertex of the network.
-    # @param {boolean}  directed - True if the network is directed. False otherwise.
     # @return {number}  Returns the network's global efficiency.
     #
-    function getGlobalEfficiency(efficiency, directed) {
-        if (core.type(directed) == "undefined") {
-            directed = false
-        }
+    function getGlobalEfficiency(efficiency) {
         dimEfficiency = core.dim(efficiency)
         n = dimEfficiency[0] - 1
-        if (directed) {
-            avgeff = matrix.sum(efficiency) / (n * (n - 1))
-        } else {
-            avgeff = matrix.sum(efficiency) / (n * (n - 1)) / 2
-        }
+        avgeff = matrix.sum(efficiency) / (n * (n - 1))
         return(avgeff)
     }
     
@@ -729,10 +917,10 @@ namespace cna {
     # @param {object}   subgraphEfficiency - An array containing network subgraphs efficiencies.
     # @return {number}  Returns the network's local efficiency.
     #
-    function getLocalEfficiency(subgraphEfficiency, directed) {
+    function getLocalEfficiency(subgraphEfficiency) {
         dimSubgraphEfficiency = core.dim(subgraphEfficiency)
         n = dimSubgraphEfficiency[0] - 1
-        localEfficiency = matrix.sum(subgraphEfficiency) / (n * (n - 1))
+        localEfficiency = matrix.sum(subgraphEfficiency) / n
         return(localEfficiency)
     }
     
