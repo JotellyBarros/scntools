@@ -1,51 +1,53 @@
-##
-# @license
-# Copyright 2020 Roberto Luiz Souza Monteiro,
-#                Renata Souza Barreto,
-#                Hernane Borges de Barros Pereira.
-#
-# Licensed under the Apache License, Version 2.0 (the 'License');
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at;
-#
-#   http://www.apache.org/licenses/LICENSE-2.0;
-#
-# Unless required by applicable law or agreed to in writing, software;
-# distributed under the License is distributed on an 'AS IS' BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, eitherMath.express or implied.
-# See the License for the specific language governing permissions and;
-# limitations under the License.
-#
+///
+/// @license
+/// Copyright 2020 Roberto Luiz Souza Monteiro,
+///                Renata Souza Barreto,
+///                Hernane Borges de Barros Pereira.
+///
+/// Licensed under the Apache License, Version 2.0 (the 'License');
+/// you may not use this file except in compliance with the License.
+/// You may obtain a copy of the License at;
+///
+///   http://www.apache.org/licenses/LICENSE-2.0;
+///
+/// Unless required by applicable law or agreed to in writing, software;
+/// distributed under the License is distributed on an 'AS IS' BASIS,
+/// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, eitherMath.express or implied.
+/// See the License for the specific language governing permissions and;
+/// limitations under the License.
+///
 
-##
-# MaiaScript Social and Complex Network Analysis library.
-# @class cna
-#
+ ///
+ /// MaiaScript Social and Complex Network Analysis library.
+ /// @namespace cna
+ ///
 namespace cna {
-    ##
-    # Creates an artificial network.
-    # @method createNetwork
-    # @param {string}   topology - Graph topology. It can be:
-    #                              complete, random, small world,
-    #                              scale-free or hybrid.
-    # @param {number}   numVertices - Number of vertices.
-    # @param {number}   numEdges - Number of edges.
-    # @param {number}   edgeProbability - Edge probability.
-    # @param {number}   averageDegree - Average degree.
-    # @return {object}  An artificial network.
-    #
+    ///
+    /// Creates an artificial network.
+    /// @method createNetwork
+    /// @memberof cna
+    /// @param {string}   topology - Graph topology. It can be:
+    ///                              complete, random, small world,
+    ///                              scale-free or hybrid.
+    /// @param {number}   numVertices - Number of vertices.
+    /// @param {number}   numEdges - Number of edges.
+    /// @param {number}   edgeProbability - Edge probability.
+    /// @param {number}   averageDegree - Average degree.
+    /// @return {object}  An artificial network.
+    ///
     function createNetwork(topology, numVertices, numEdges, edgeProbability, averageDegree) {
         adj = ann.createANN(topology, numVertices, numEdges, edgeProbability, averageDegree)
         return(adj)
     }
 
-    ##
-    # Creates a Pajek file.
-    # @method createPajekFile
-    # @param {object}   adj - Adjascence matrix.
-    # @param {string}   type - File type (edges, arcs or matrix).
-    # @return {string}  A Pajek file.
-    #
+    ///
+    /// Creates a Pajek file.
+    /// @method createPajekFile
+    /// @memberof cna
+    /// @param {object}   adj - Adjascence matrix.
+    /// @param {string}   type - File type (edges, arcs or matrix).
+    /// @return {string}  A Pajek file.
+    ///
     function createPajekFile(adj, type) {
         if (core.type(type) == "undefined") {
             type = "edges"
@@ -93,13 +95,14 @@ namespace cna {
         return(fileContents)
     }
     
-    ##
-    # Parses a Pajek file.
-    # @method parsePajekFile
-    # @param {string}   fileContents - Pajek file contents.
-    # @param {object}   properties - Network properties (n, m and directed).
-    # @return {object}  An adjascence matrix.
-    #
+    ///
+    /// Parses a Pajek file.
+    /// @method parsePajekFile
+    /// @memberof cna
+    /// @param {string}   fileContents - Pajek file contents.
+    /// @param {object}   properties - Network properties (n, m and directed).
+    /// @return {object}  An adjascence matrix.
+    ///
     function parsePajekFile(fileContents, properties) {
         if (core.type(properties) == "undefined") {
             properties = {
@@ -221,13 +224,14 @@ namespace cna {
         return(adj)
     }
     
-    ##
-    # Convert a file in Pajek format to JSON.
-    # @method pajekFileToJson
-    # @param {string}   fileContents - Pajek file contents.
-    # @param {object}   properties - Network properties (n, m and directed).
-    # @return {object}  A JSON containing the network..
-    #
+    ///
+    /// Convert a file in Pajek format to JSON.
+    /// @method pajekFileToJson
+    /// @memberof cna
+    /// @param {string}   fileContents - Pajek file contents.
+    /// @param {object}   properties - Network properties (n, m and directed).
+    /// @return {object}  A JSON containing the network..
+    ///
     function pajekFileToJson(fileContents, properties) {
         if (core.type(properties) == "undefined") {
             properties = {
@@ -396,13 +400,14 @@ namespace cna {
         return(network)
     }
 
-    ##
-    # Transitive closure between two matrices (A and B).
-    # @method getTransitiveClosure
-    # @param {object}   a - Matrix A.
-    # @param {object}   b - Matrix B.
-    # @return {object}  Transitive closure between two matrices.
-    #
+    ///
+    /// Transitive closure between two matrices (A and B).
+    /// @method getTransitiveClosure
+    /// @memberof cna
+    /// @param {object}   a - Matrix A.
+    /// @param {object}   b - Matrix B.
+    /// @return {object}  Transitive closure between two matrices.
+    ///
     function getTransitiveClosure(a, b) {
         dimA = core.dim(a)
         dimB = core.dim(b)
@@ -423,13 +428,14 @@ namespace cna {
         }
     }
     
-    ##
-    # Boolean OR between two matrices (A and B).
-    # @method getBooleanOr
-    # @param {object}   a - Matrix A.
-    # @param {object}   b - Matrix B.
-    # @return {object}  Boolean OR between two matrices.
-    #
+    ///
+    /// Boolean OR between two matrices (A and B).
+    /// @method getBooleanOr
+    /// @memberof cna
+    /// @param {object}   a - Matrix A.
+    /// @param {object}   b - Matrix B.
+    /// @return {object}  Boolean OR between two matrices.
+    ///
     function getBooleanOr(a, b) {
         dimA = core.dim(a)
         dimB = core.dim(b)
@@ -446,13 +452,14 @@ namespace cna {
         }
     }
     
-    ##
-    # Calculates the network density.
-    # @method getDensity
-    # @param {object}   adj - Adjascence matrix.
-    # @param {boolean}  directed - True if the network is directed.
-    # @return {number}  The network density.
-    #
+    ///
+    /// Calculates the network density.
+    /// @method getDensity
+    /// @memberof cna
+    /// @param {object}   adj - Adjascence matrix.
+    /// @param {boolean}  directed - True if the network is directed.
+    /// @return {number}  The network density.
+    ///
     function getDensity(adj, directed) {
         if (core.type(directed) == "undefined") {
             directed = false
@@ -474,13 +481,14 @@ namespace cna {
         return(density)
     }
     
-    ##
-    # Calculates the degrees of the vertices of the matrix.
-    # @method getDegrees
-    # @param {object}   adj - Adjascence matrix.
-    # @param {boolean}  directed - True if the network is directed.
-    # @return {object}  Returns a array containing the degrees of the vertices.
-    #
+    ///
+    /// Calculates the degrees of the vertices of the matrix.
+    /// @method getDegrees
+    /// @memberof cna
+    /// @param {object}   adj - Adjascence matrix.
+    /// @param {boolean}  directed - True if the network is directed.
+    /// @return {object}  Returns a array containing the degrees of the vertices.
+    ///
     function getDegrees(adj, directed) {
         if (core.type(directed) == "undefined") {
             directed = false
@@ -505,12 +513,13 @@ namespace cna {
         return(degrees)
     }
     
-    ##
-    # Calculates the degrees distribution in the network.
-    # @method getDegreeDistribution
-    # @param {object}   degrees - Array containing degrees of the vertices.
-    # @return {object}  Returns an array containing the degrees distribution in the network.
-    #
+    ///
+    /// Calculates the degrees distribution in the network.
+    /// @method getDegreeDistribution
+    /// @memberof cna
+    /// @param {object}   degrees - Array containing degrees of the vertices.
+    /// @return {object}  Returns an array containing the degrees distribution in the network.
+    ///
     function getDegreeDistribution(degrees) {
         dimDegrees = core.dim(degrees)
         dimI = dimDegrees[0]
@@ -556,12 +565,13 @@ namespace cna {
     	return(hist)
     }
     
-    ##
-    # Calculates average degree of the network.
-    # @method getAverageDegree
-    # @param {object}   degrees - Array containing degrees of the vertices.
-    # @return {number}  Returns the average degree of the network.
-    #
+    ///
+    /// Calculates average degree of the network.
+    /// @method getAverageDegree
+    /// @memberof cna
+    /// @param {object}   degrees - Array containing degrees of the vertices.
+    /// @return {number}  Returns the average degree of the network.
+    ///
     function getAverageDegree(degrees) {
         dimDegrees = core.dim(degrees)
         dimI = dimDegrees[0]
@@ -569,13 +579,14 @@ namespace cna {
         return(avgDeg.avg)
     }
     
-    ##
-    # Calculates the clustering coefficients of the vertices.
-    # @method getClustering
-    # @param {object}   adj - Adjascence matrix.
-    # @param {boolean}  directed - True if the network is directed.
-    # @return {object}  Returns an array containing the clustering coefficients of the vertices.
-    #
+    ///
+    /// Calculates the clustering coefficients of the vertices.
+    /// @method getClustering
+    /// @memberof cna
+    /// @param {object}   adj - Adjascence matrix.
+    /// @param {boolean}  directed - True if the network is directed.
+    /// @return {object}  Returns an array containing the clustering coefficients of the vertices.
+    ///
     function getClustering(adj, directed) {
         if (core.type(directed) == "undefined") {
             directed = false
@@ -634,12 +645,13 @@ namespace cna {
         return(clustering)
     }
     
-    ##
-    # Calculates average clustering coefficient of the network.
-    # @method getAverageClustering
-    # @param {object}   clustering - Array containing the clustering coefficients of the vertices.
-    # @return {number}  Returns the average clustering coefficient of the network.
-    #
+    ///
+    /// Calculates average clustering coefficient of the network.
+    /// @method getAverageClustering
+    /// @memberof cna
+    /// @param {object}   clustering - Array containing the clustering coefficients of the vertices.
+    /// @return {number}  Returns the average clustering coefficient of the network.
+    ///
     function getAverageClustering(clustering) {
         dimClustering = core.dim(clustering)
         n = dimClustering[0] - 1
@@ -647,12 +659,13 @@ namespace cna {
         return(avgClustering)
     }
     
-    ##
-    # Calculates the shortest parh between each two vetices in the matrix.
-    # @method getShortestPath
-    # @param {object}   adj - Adjascence matrix.
-    # @return {object}  Returns an array containing the shortest parh between each two vetice in the matrix.
-    #
+    ///
+    /// Calculates the shortest parh between each two vetices in the matrix.
+    /// @method getShortestPath
+    /// @memberof cna
+    /// @param {object}   adj - Adjascence matrix.
+    /// @return {object}  Returns an array containing the shortest parh between each two vetice in the matrix.
+    ///
     function getShortestPath(adj) {
         dimAdj = core.dim(adj)
         dimI = dimAdj[0]
@@ -694,12 +707,13 @@ namespace cna {
         return(geodesic)
     }
     
-    ##
-    # Calculates average shortest path of the network.
-    # @method getAverageShortestPath
-    # @param {object}   geodesic - Array the shortest parh between each two vetices in the matrix.
-    # @return {number}  Returns the average shortest path of the network.
-    #
+    ///
+    /// Calculates average shortest path of the network.
+    /// @method getAverageShortestPath
+    /// @memberof cna
+    /// @param {object}   geodesic - Array the shortest parh between each two vetices in the matrix.
+    /// @return {number}  Returns the average shortest path of the network.
+    ///
     function getAverageShortestPath(geodesic) {
         dimGeodesic = core.dim(geodesic)
         dimI = dimGeodesic[0]
@@ -713,24 +727,26 @@ namespace cna {
         return(avgshortestpath)
     }
     
-    ##
-    # Calculates the network diameter.
-    # @method getDiameter
-    # @param {object}   geodesic - Array the shortest parh between each two vetices in the matrix.
-    # @return {number}  Returns the network diameter.
-    #
+    ///
+    /// Calculates the network diameter.
+    /// @method getDiameter
+    /// @memberof cna
+    /// @param {object}   geodesic - Array the shortest parh between each two vetices in the matrix.
+    /// @return {number}  Returns the network diameter.
+    ///
     function getDiameter(geodesic) {
         diameter = matrix.max(geodesic)
         return(diameter)
     }
     
-    ##
-    # Calculates the shortest parh between each two vetices in the matrix using Floyd Warshall method.
-    # @method getFloydWarshallShortestPath
-    # @param {object}   adj - Adjascence matrix.
-    # @param {object}   path - Matrix to store paths.
-    # @return {object}  Returns an array containing the shortest parh between each two vetice in the matrix.
-    #
+    ///
+    /// Calculates the shortest parh between each two vetices in the matrix using Floyd Warshall method.
+    /// @method getFloydWarshallShortestPath
+    /// @memberof cna
+    /// @param {object}   adj - Adjascence matrix.
+    /// @param {object}   path - Matrix to store paths.
+    /// @return {object}  Returns an array containing the shortest parh between each two vetice in the matrix.
+    ///
     function getFloydWarshallShortestPath(adj, path) {
         dimAdj = core.dim(adj)
         dimI = dimAdj[0]
@@ -772,14 +788,15 @@ namespace cna {
         return(geodesic)
     }
     
-    ##
-    # Do a shortest parh walk in the network and returns the path.
-    # @method doShortestPathWalk
-    # @param {object}   path - Paths matrix.
-    # @param {number}   i - Element index.
-    # @param {number}   j - Element index.
-    # @return {object}  Returns an array containing the shortest parh walk between two vetice in the matrix.
-    #
+    ///
+    /// Do a shortest parh walk in the network and returns the path.
+    /// @method doShortestPathWalk
+    /// @memberof cna
+    /// @param {object}   path - Paths matrix.
+    /// @param {number}   i - Element index.
+    /// @param {number}   j - Element index.
+    /// @return {object}  Returns an array containing the shortest parh walk between two vetice in the matrix.
+    ///
     function doShortestPathWalk(path, i, j) {
         if (path[i, j] == -1) {
             return([])
@@ -792,14 +809,15 @@ namespace cna {
         return(pij)
     }
     
-    ##
-    # Return the number os geodesics in the network.
-    # @method getNumberOfGeodesics
-    # @param {object}   adj - Adjascence matrix.
-    # @param {object}   geodesic - Vector including the geodesics of the network.
-    # @param {boolean}  directed - True if the network is directed. False otherwise.
-    # @return {number}  Returns the number os geodesics in the network.
-    #
+    ///
+    /// Return the number os geodesics in the network.
+    /// @method getNumberOfGeodesics
+    /// @memberof cna
+    /// @param {object}   adj - Adjascence matrix.
+    /// @param {object}   geodesic - Vector including the geodesics of the network.
+    /// @param {boolean}  directed - True if the network is directed. False otherwise.
+    /// @return {number}  Returns the number os geodesics in the network.
+    ///
     function getNumberOfGeodesics(adj, geodesic, directed) {
         dimGeodesic = core.dim(geodesic)
         dimI = dimGeodesic[0]
@@ -827,14 +845,15 @@ namespace cna {
         return(gjk)
     }
     
-    ##
-    # Returns an array containing the centralities of each pair of the network's vertices.
-    # @method getCentrality
-    # @param {object}   adj - Adjascence matrix.
-    # @param {object}   geodesic - Vector including the geodesics of the network.
-    # @param {boolean}  directed - True if the network is directed. False otherwise.
-    # @return {object}  Returns an array containing the centralities of each pair of the network's vertices
-    #
+    ///
+    /// Returns an array containing the centralities of each pair of the network's vertices.
+    /// @method getCentrality
+    /// @memberof cna
+    /// @param {object}   adj - Adjascence matrix.
+    /// @param {object}   geodesic - Vector including the geodesics of the network.
+    /// @param {boolean}  directed - True if the network is directed. False otherwise.
+    /// @return {object}  Returns an array containing the centralities of each pair of the network's vertices
+    ///
     function getCentrality(adj, geodesic, directed) {
         dimGeodesic = core.dim(geodesic)
         dimI = dimGeodesic[0]
@@ -875,12 +894,13 @@ namespace cna {
         return(centrality)
     }
     
-    ##
-    # Returns an array containing the vertex efficiency of each pair of the network's vertices.
-    # @method getVertexEfficiency
-    # @param {object}   geodesic - Vector including the geodesics of the network.
-    # @return {object}  Returns an array containing the vertex efficiency of each pair of the network's vertices
-    #
+    ///
+    /// Returns an array containing the vertex efficiency of each pair of the network's vertices.
+    /// @method getVertexEfficiency
+    /// @memberof cna
+    /// @param {object}   geodesic - Vector including the geodesics of the network.
+    /// @return {object}  Returns an array containing the vertex efficiency of each pair of the network's vertices
+    ///
     function getVertexEfficiency(geodesic) {
         dimGeodesic = core.dim(geodesic)
         dimI = dimGeodesic[0]
@@ -896,12 +916,13 @@ namespace cna {
         return(efficiency)
     }
     
-    ##
-    # Returns the network's global efficiency.
-    # @method getGlobalEfficiency
-    # @param {object}   efficiency - Array containing the vertex efficiency of each vertex of the network.
-    # @return {number}  Returns the network's global efficiency.
-    #
+    ///
+    /// Returns the network's global efficiency.
+    /// @method getGlobalEfficiency
+    /// @memberof cna
+    /// @param {object}   efficiency - Array containing the vertex efficiency of each vertex of the network.
+    /// @return {number}  Returns the network's global efficiency.
+    ///
     function getGlobalEfficiency(efficiency) {
         dimEfficiency = core.dim(efficiency)
         n = dimEfficiency[0] - 1
@@ -909,12 +930,13 @@ namespace cna {
         return(avgeff)
     }
 
-    ##
-    # Returns the network vertices labels.
-    # @method getLabels
-    # @param {object}   adj - Adjascence matrix.
-    # @return {object}  Returns the network vertices labels.
-    #
+    ///
+    /// Returns the network vertices labels.
+    /// @method getLabels
+    /// @memberof cna
+    /// @param {object}   adj - Adjascence matrix.
+    /// @return {object}  Returns the network vertices labels.
+    ///
     function getLabels(adj) {
         dimAdj = core.dim(adj)
         dimI = dimAdj[0]
@@ -925,13 +947,14 @@ namespace cna {
         return(labels)
     }
     
-    ##
-    # Sets the network vertices labels.
-    # @method getLabels
-    # @param {object}  adj - Adjascence matrix.
-    # @param {object}  labels - Array containing the vertices labels.
-    # @return {obj}    Matrix with vertex labels set.
-    #
+    ///
+    /// Sets the network vertices labels.
+    /// @method getLabels
+    /// @memberof cna
+    /// @param {object}  adj - Adjascence matrix.
+    /// @param {object}  labels - Array containing the vertices labels.
+    /// @return {obj}    Matrix with vertex labels set.
+    ///
     function setLabels(adj, labels) {
         dimAdj = core.dim(adj)
         dimI = dimAdj[0]
@@ -942,12 +965,13 @@ namespace cna {
         return(adj)
     }
     
-    ##
-    # Removes the network vertices labels.
-    # @method getLabels
-    # @param {object}   adj - Adjascence matrix.
-    # @return {number}  Removes the network vertices labels.
-    #
+    ///
+    /// Removes the network vertices labels.
+    /// @method getLabels
+    /// @memberof cna
+    /// @param {object}   adj - Adjascence matrix.
+    /// @return {number}  Removes the network vertices labels.
+    ///
     function removeLabels(adj) {
         dimAdj = core.dim(adj)
         dimI = dimAdj[0]
